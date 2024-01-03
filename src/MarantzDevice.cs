@@ -7,10 +7,11 @@ using Crestron.SimplSharpPro.DeviceSupport;
 using PepperDash.Core;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
+using Feedback = PepperDash.Essentials.Core.Feedback;
 
 namespace PDT.Plugins.Marantz
 {
-	public class MarantzDevice : EssentialsBridgeableDevice, IOnline, IHasPowerControlWithFeedback, IBasicVolumeWithFeedback, IRouting, ICommunicationMonitor
+	public class MarantzDevice : EssentialsBridgeableDevice, IOnline, IHasPowerControlWithFeedback, IBasicVolumeWithFeedback, IRouting, ICommunicationMonitor, IHasFeedback
     {
 		private readonly GenericCommunicationMonitor _commsMonitor;
 	    private readonly IBasicCommunication _comms;
@@ -66,14 +67,7 @@ namespace PDT.Plugins.Marantz
             VolumeLevelFeedback = new IntFeedback("Volume", () => CrestronEnvironment.ScaleWithLimits(VolumeLevel, 100, 0, int.MaxValue, int.MinValue));
             MuteFeedback = new BoolFeedback("Mute", () => MuteIsOn);
 
-            var poll = new CTimer(s =>
-            {
-                var device = (MarantzDevice) s;
-                device.SendText("PW?");
-                device.SendText("MU?");
-                device.SendText("MS?");
-                device.SendText("SI?");
-            }, this, Timeout.Infinite);
+            var poll = new CTimer(Poll, this, Timeout.Infinite);
 
             _commsMonitor.StatusChange += (sender, args) =>
             {
@@ -91,6 +85,36 @@ namespace PDT.Plugins.Marantz
             {
                 if (args.BoolValue)
                     poll.Reset(25, 2000);
+            };
+
+            CrestronConsole.AddNewConsoleCommand(s =>
+            {
+                var request = s.Trim().ToLower();
+                switch (request)
+                {
+                    case "poll":
+                        poll.Reset(0, 2000);
+                        break;
+                    case "poweron":
+                        PowerOn();
+                        break;
+                    case "poweroff":
+                        PowerOff();
+                        break;
+                    case "power?":
+                        CrestronConsole.ConsoleCommandResponse("{0}", PowerIsOn);
+                        break;
+                    default:
+                        CrestronConsole.ConsoleCommandResponse("Unknown device request:{0}", s);
+                        break;
+                }
+            }, Key, "Commands to trigger device actions", ConsoleAccessLevelEnum.AccessOperator);
+
+            Feedbacks = new FeedbackCollection<Feedback>
+            {
+                PowerIsOnFeedback,
+                MuteFeedback,
+                IsOnline
             };
         }
 
@@ -123,18 +147,23 @@ namespace PDT.Plugins.Marantz
 		    {
                 switch (rx)
                 {
+                    //TODO: break into its own method
                     case "PWON":
                         PowerIsOn = true;
                         break;
                     case "PWSTANDBY":
                         PowerIsOn = false;
                         break;
+
+                    //TODO: break into its own method
                     case "MUON":
                         MuteIsOn = true;
                         break;
                     case "MUOFF":
                         MuteIsOn = false;
                         break;
+
+                    //TODO: break into its own method
                     case "SIPHONO":
                         break;
                     case "SICD":
@@ -167,6 +196,8 @@ namespace PDT.Plugins.Marantz
                         break;
                     case "SIPAUX5":
                         break;
+
+                    //TODO: break into its own method
                     case "MSAUTO":
                         break;
                     case "MSSTEREO":
@@ -190,6 +221,17 @@ namespace PDT.Plugins.Marantz
             _comms.SendText(messageToSend);
 		}
 
+	    private static void Poll(object state)
+	    {
+            var device = (MarantzDevice) state;
+            device.SendText("PW?");
+
+	        if (!device.PowerIsOn) return;
+
+	        device.SendText("MU?");
+	        device.SendText("MS?");
+	        device.SendText("SI?");
+	    }
 
         public override void LinkToApi(BasicTriList trilist, uint joinStart, string joinMapKey, EiscApiAdvanced bridge)
         {
@@ -258,22 +300,24 @@ namespace PDT.Plugins.Marantz
 
 	        _rampVolumeDown = false;
 
-	        CrestronInvoke.BeginInvoke(state =>
-	        {
-	            var device = (MarantzDevice) state;
+            CrestronInvoke.BeginInvoke(RampVolumeUp, this);
+	    }
 
-	            using (var wh = new CEvent(true, false))
+	    private static void RampVolumeUp(object state)
+	    {
+            var device = (MarantzDevice)state;
+
+            using (var wh = new CEvent(true, false))
+            {
+                var level = device.VolumeLevel;
+                while (device._rampVolumeUp && level < 99)
                 {
-                    var level = device.VolumeLevel;
-                    while (device._rampVolumeUp && level < 99)
-	                {
-                        var newLevel = ++level;
-	                    var request = MarantzUtils.VolumeCommand(newLevel);
-                        device.SendText(request);
-	                    wh.Wait(50);
-	                }
-	            }
-	        }, this);
+                    var newLevel = ++level;
+                    var request = MarantzUtils.VolumeCommand(newLevel);
+                    device.SendText(request);
+                    wh.Wait(50);
+                }
+            }
 	    }
 
         private volatile bool _rampVolumeDown;
@@ -288,22 +332,25 @@ namespace PDT.Plugins.Marantz
 
 	        _rampVolumeUp = false;
 
-	        CrestronInvoke.BeginInvoke(state =>
-	        {
-                var device = (MarantzDevice) state;
-	            using (var wh = new CEvent(true, false))
-                {
-                    var level = device.VolumeLevel;
-                    while (device._rampVolumeUp && level > 1)
-	                {
-                        var newLevel = --level;
-	                    var request = MarantzUtils.VolumeCommand(newLevel);
-                        device.SendText(request);
-	                    wh.Wait(50);
-	                }
-	            }
-	        }, this);
+            CrestronInvoke.BeginInvoke(RampVolumeDown, this);
 	    }
+
+        private static void RampVolumeDown(object state)
+        {
+            var device = (MarantzDevice)state;
+
+            using (var wh = new CEvent(true, false))
+            {
+                var level = device.VolumeLevel;
+                while (device._rampVolumeDown && level > 1)
+                {
+                    --level;
+                    var request = MarantzUtils.VolumeCommand(level);
+                    device.SendText(request);
+                    wh.Wait(50);
+                }
+            }
+        }
 
 	    public void MuteToggle()
 	    {
@@ -344,6 +391,8 @@ namespace PDT.Plugins.Marantz
 	    {
 	        throw new NotImplementedException();
 	    }
+
+	    public FeedbackCollection<Feedback> Feedbacks { get; private set; }
     }
 }
 
