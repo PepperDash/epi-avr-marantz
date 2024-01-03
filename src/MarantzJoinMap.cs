@@ -1,18 +1,8 @@
 ﻿using PepperDash.Essentials.Core;
 
-namespace EssentialsPluginTemplate
+namespace PDT.Plugins.Marantz
 {
-	/// <summary>
-	/// Plugin device Bridge Join Map
-	/// </summary>
-	/// <remarks>
-	/// Rename the class to match the device plugin being developed.  Reference Essentials JoinMaps, if one exists for the device plugin being developed
-	/// </remarks>
-	/// <see cref="PepperDash.Essentials.Core.Bridges"/>
-	/// <example>
-	/// "EssentialsPluginBridgeJoinMapTemplate" renamed to "SamsungMdcBridgeJoinMap"
-	/// </example>
-	public class EssentialsPluginTemplateBridgeJoinMap : JoinMapBaseAdvanced
+	public class MarantzJoinMap : JoinMapBaseAdvanced
 	{
 		#region Digital
 
@@ -93,8 +83,8 @@ namespace EssentialsPluginTemplate
 		/// Plugin device BridgeJoinMap constructor
 		/// </summary>
 		/// <param name="joinStart">This will be the join it starts on the EISC bridge</param>
-        public EssentialsPluginTemplateBridgeJoinMap(uint joinStart)
-            : base(joinStart, typeof(EssentialsPluginTemplateBridgeJoinMap))
+        public MarantzJoinMap(uint joinStart)
+            : base(joinStart, typeof(MarantzJoinMap))
 		{
 		}
 	}
