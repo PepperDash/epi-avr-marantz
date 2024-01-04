@@ -6,8 +6,6 @@ namespace PDT.Plugins.Marantz
 	{
 		#region Digital
 
-		// TODO [ ] Add digital joins below plugin being developed
-
 		[JoinName("IsOnline")]
 		public JoinDataComplete IsOnline = new JoinDataComplete(
 			new JoinData
@@ -22,48 +20,32 @@ namespace PDT.Plugins.Marantz
 				JoinType = eJoinType.Digital
 			});
 
-		[JoinName("Connect")]
-		public JoinDataComplete Connect = new JoinDataComplete(
-			new JoinData
-			{
-				JoinNumber = 2,
-				JoinSpan = 1
-			},
-			new JoinMetadata
-			{
-				Description = "Connect (Held)/Disconnect (Release) & corresponding feedback",
-				JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
-				JoinType = eJoinType.Digital
-			});		
+        [JoinName("PowerIsOn")]
+        public JoinDataComplete PowerIsOn = new JoinDataComplete(
+            new JoinData
+            {
+                JoinNumber = 2,
+                JoinSpan = 1
+            },
+            new JoinMetadata
+            {
+                Description = "Power Is On",
+                JoinCapabilities = eJoinCapabilities.ToSIMPL,
+                JoinType = eJoinType.Digital
+            });
 
 		#endregion
 
 
 		#region Analog
 
-		// TODO [ ] Add analog joins below plugin being developed
-
-		[JoinName("Status")]
-		public JoinDataComplete Status = new JoinDataComplete(
-			new JoinData
-			{
-				JoinNumber = 1,
-				JoinSpan = 1
-			},
-			new JoinMetadata
-			{
-				Description = "Socket Status",
-				JoinCapabilities = eJoinCapabilities.ToSIMPL,
-				JoinType = eJoinType.Analog
-			});
 
 		#endregion
 
 
 		#region Serial
 
-		// TODO [ ] Add serial joins below plugin being developed
-
+        [JoinName("DeviceName")]
 		public JoinDataComplete DeviceName = new JoinDataComplete(
 			new JoinData
 			{
@@ -76,6 +58,32 @@ namespace PDT.Plugins.Marantz
 				JoinCapabilities = eJoinCapabilities.ToSIMPL,
 				JoinType = eJoinType.Serial
 			});
+
+        public JoinDataComplete DeviceInput = new JoinDataComplete(
+            new JoinData
+            {
+                JoinNumber = 2,
+                JoinSpan = 1
+            },
+            new JoinMetadata
+            {
+                Description = "Device Input",
+                JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
+                JoinType = eJoinType.Serial
+            });
+
+        public JoinDataComplete SurroundMode = new JoinDataComplete(
+            new JoinData
+            {
+                JoinNumber = 3,
+                JoinSpan = 1
+            },
+            new JoinMetadata
+            {
+                Description = "Surround Mode",
+                JoinCapabilities = eJoinCapabilities.ToFromSIMPL,
+                JoinType = eJoinType.Serial
+            });
 
 		#endregion
 
