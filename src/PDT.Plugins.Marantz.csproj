@@ -83,13 +83,19 @@
     <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IHasInputs.cs" />
+    <Compile Include="IHasSurroundChannels.cs" />
+    <Compile Include="IInput.cs" />
     <Compile Include="MarantzChannelVolume.cs" />
+    <Compile Include="MarantzInput.cs" />
     <Compile Include="MarantzJoinMap.cs" />
     <Compile Include="MarantzProps.cs" />
     <Compile Include="MarantzDevice.cs" />
     <Compile Include="MarantzDeviceFactory.cs" />
+    <Compile Include="MarantzSurroundChannel.cs" />
     <Compile Include="MarantzUtils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SurroundChannel.cs" />
     <None Include="Properties\ControlSystem.cfg" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CompactFramework.CSharp.targets" />

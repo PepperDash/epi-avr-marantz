@@ -4,11 +4,12 @@ using PepperDash.Essentials.Core;
 
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzChannelVolume : IKeyed
+    public class MarantzChannelVolume : IKeyed, IBasicVolumeWithFeedback
     {
         private readonly string _channelName;
         private readonly MarantzDevice _parent;
 
+        private int _lastVolume;
         private int _volumeLevel;
         public int VolumeLevel
         {
@@ -26,6 +27,10 @@ namespace PDT.Plugins.Marantz
             // Main volume range = 38 - 62 | 0db = 50
             VolumeLevelFeedback = new IntFeedback(_channelName + "-Volume", () =>
                 CrestronEnvironment.ScaleWithLimits(VolumeLevel, 62, 38, int.MaxValue, int.MinValue));
+
+            MuteFeedback = new BoolFeedback(_channelName + "-Mute", () => VolumeLevelFeedback.IntValue == 0);
+
+            VolumeLevelFeedback.OutputChange += (sender, args) => MuteFeedback.FireUpdate();
         }
 
         private volatile bool _rampVolumeUp;
@@ -75,6 +80,7 @@ namespace PDT.Plugins.Marantz
             CrestronInvoke.BeginInvoke(RampVolumeDown, this);
         }
 
+
         private static void RampVolumeDown(object state)
         {
             var device = (MarantzChannelVolume)state;
@@ -92,12 +98,37 @@ namespace PDT.Plugins.Marantz
             }
         }
 
+        public void MuteOn()
+        {
+            _lastVolume = VolumeLevelFeedback.IntValue;
+            SetVolume(0);
+        }
+
+        public void MuteOff()
+        {
+            SetVolume((ushort)_lastVolume);
+        }
+
+        public void MuteToggle()
+        {
+            if (MuteFeedback.BoolValue)
+            {
+                MuteOff();
+            }
+            else
+            {
+                MuteOn();
+            }
+        }
+
         public void SetVolume(ushort level)
         {
             var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, uint.MaxValue, uint.MinValue, 62, 38);
             var request = MarantzUtils.ChannelVolumeCommand(_channelName, (int)desiredLevel);
             _parent.SendText(request);
         }
+
+        public BoolFeedback MuteFeedback { get; private set; }
 
         public IntFeedback VolumeLevelFeedback { get; private set; }
 
