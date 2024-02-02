@@ -6,6 +6,7 @@ using Crestron.SimplSharpPro.DeviceSupport;
 using PepperDash.Core;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
+using PepperDash.Essentials.Core.DeviceInfo;
 using Feedback = PepperDash.Essentials.Core.Feedback;
 
 namespace PDT.Plugins.Marantz
@@ -18,7 +19,9 @@ namespace PDT.Plugins.Marantz
         ICommunicationMonitor, 
         IHasFeedback,
         IHasSurroundChannels,
-        IHasInputs
+        IHasInputs,
+        IRoutingSinkWithSwitching,
+        IDeviceInfoProvider
     {
         private readonly IBasicCommunication _comms;
         private readonly GenericCommunicationMonitor _commsMonitor;
@@ -90,6 +93,8 @@ namespace PDT.Plugins.Marantz
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
         {
+            DeviceInfo = new DeviceInfo();
+
             _surroundChannels = new Dictionary<SurroundChannel, MarantzChannelVolume>();
 
             _comms = comms;
@@ -186,7 +191,8 @@ namespace PDT.Plugins.Marantz
 
             OutputPorts = new RoutingPortCollection<RoutingOutputPort>
             {
-                new RoutingOutputPort("ZONE1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "", this)
+                new RoutingOutputPort("ZONE1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "", this),
+                new RoutingOutputPort("ZONE2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "Z2", this)
             };
         }
 
@@ -635,7 +641,7 @@ namespace PDT.Plugins.Marantz
         public IDictionary<SurroundChannel, IBasicVolumeWithFeedback> Channels
         {
             get
-            {
+            {           
                 return _surroundChannels.ToDictionary(pair => pair.Key, pair => pair.Value as IBasicVolumeWithFeedback);
             }
         }
@@ -646,5 +652,72 @@ namespace PDT.Plugins.Marantz
         {
             get { return _inputs.ToDictionary(pair => pair.Key, pair => pair.Value as IInput); }
         }
+
+        public string CurrentSourceInfoKey { get; set; }
+
+        public SourceListItem CurrentSourceInfo
+        {
+            get
+            {
+                return _currentSourceItem;
+            }
+            set
+            {
+                if (value == _currentSourceItem) return;
+                CurrentSourceInfoKey = value.SourceListKey;
+
+                var handler = CurrentSourceChange;
+
+                if (handler != null)
+                    handler(_currentSourceItem, ChangeType.WillChange);
+
+                _currentSourceItem = value;
+
+                if (handler != null)
+                    handler(_currentSourceItem, ChangeType.DidChange);
+            }
+        }
+
+        private SourceListItem _currentSourceItem;
+
+        public event SourceInfoChangeHandler CurrentSourceChange;
+
+        public void ExecuteSwitch(object inputSelector)
+        {
+            try
+            {
+                var inputToSend = (string)inputSelector;
+                SetInput(inputToSend);
+            }
+            catch (Exception ex)
+            {
+                Debug.Console(1, Debug.ErrorLogLevel.Notice, "Caught an exception routing: {0}", ex);
+            }
+        }
+
+        public void UpdateDeviceInfo()
+        {
+            var socket = _comms as GenericTcpIpClient;
+            if (socket == null)
+                return;
+
+            DeviceInfo = new DeviceInfo
+            {
+                FirmwareVersion = "",
+                HostName = "",
+                IpAddress = socket.Hostname,
+                MacAddress = "",
+                SerialNumber = ""
+            };
+
+            var handler = DeviceInfoChanged;
+            if (handler == null) return;
+
+            handler(this, new DeviceInfoEventArgs { DeviceInfo = DeviceInfo });
+        }
+
+        public DeviceInfo DeviceInfo { get; private set; }
+
+        public event DeviceInfoChangeHandler DeviceInfoChanged;
     }
 }
