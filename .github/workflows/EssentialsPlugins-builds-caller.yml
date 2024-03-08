@@ -10,7 +10,7 @@ jobs:
     uses: PepperDash/workflow-templates/.github/workflows/essentialsplugins-getversion.yml@main
     secrets: inherit
   build-3Series:  
-    uses: PepperDash/workflow-templates/.github/workflows/essentialsplugins-3series-builds.yml@main
+    uses: PepperDash/workflow-templates/.github/workflows/essentialsplugins-3Series-builds.yml@main
     secrets: inherit
     needs: getVersions
     with:
@@ -19,7 +19,7 @@ jobs:
       tag: ${{ needs.get_version.outputs.tag }}
       channel: ${{ needs.get_version.outputs.channel }}
   build-4Series:
-    uses: PepperDash/workflow-templates/.github/workflows/essentialsplugins-4series-builds.yml@main
+    uses: PepperDash/workflow-templates/.github/workflows/essentialsplugins-4Series-builds.yml@main
     secrets: inherit
     needs: getVersions
     with:
