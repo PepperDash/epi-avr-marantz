@@ -7,7 +7,9 @@ using PepperDash.Core;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
 using PepperDash.Essentials.Core.DeviceInfo;
+using PepperDash.Essentials.Core.Queues;
 using Feedback = PepperDash.Essentials.Core.Feedback;
+using Crestron.SimplSharpPro.CrestronThread;
 
 namespace PDT.Plugins.Marantz
 {
@@ -27,6 +29,8 @@ namespace PDT.Plugins.Marantz
         private readonly GenericCommunicationMonitor _commsMonitor;
         private readonly IDictionary<string, MarantzInput> _inputs;
         private readonly IDictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
+
+        private readonly GenericQueue _receiveQueue;
 
         private const string CommsDelimiter = "\r";
 
@@ -62,7 +66,28 @@ namespace PDT.Plugins.Marantz
             set
             {
                 _volumeLevel = value;
+                Debug.Console(2, this, " Volume Level: {0}", _volumeLevel);
                 VolumeLevelFeedback.FireUpdate();
+            }
+        }
+
+        private int _maxVolLevel;
+        public int MaxVolLevel
+        {
+            get { return _maxVolLevel; }
+            set
+            {
+                _maxVolLevel = value;
+            }
+        }
+
+        private int _minVolLevel;
+        public int MinVolLevel
+        {
+            get { return _minVolLevel; }
+            set
+            {
+                _minVolLevel = value;
             }
         }
 
@@ -93,6 +118,8 @@ namespace PDT.Plugins.Marantz
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
         {
+            _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
+
             DeviceInfo = new DeviceInfo();
 
             _surroundChannels = new Dictionary<SurroundChannel, MarantzChannelVolume>();
@@ -254,7 +281,7 @@ namespace PDT.Plugins.Marantz
 
             // Main volume range = 0 - 98
             VolumeLevelFeedback = new IntFeedback("Volume", () =>
-                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 98, 0, int.MaxValue, int.MinValue));
+                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 98, 0, 65535, 0));
 
             MuteFeedback = new BoolFeedback("Mute", () => MuteIsOn);
 
@@ -306,17 +333,36 @@ namespace PDT.Plugins.Marantz
         {
             var rx = args.Text.Trim();
 
-            if (rx.StartsWith("MV"))
+            _receiveQueue.Enqueue(new ProcessStringMessage(rx, ParseResponse));
+
+        }
+
+        private void ParseResponse(string rx)
+        { 
+            if (rx.StartsWith("MVMAX"))
+            {
+                try
+                {
+                    var maxVolString = rx.TrimStart(new[] { 'M', 'V', 'M', 'A', 'X' });
+                    MaxVolLevel = int.Parse(maxVolString);
+                }
+                catch (Exception ex)
+                {
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing max volume response: {0}{1}",
+                                               rx, ex);
+                }
+            }
+            else if (rx.StartsWith("MV"))
             {
                 // MV80<CR>
                 try
-                {
+                { 
                     var volumeString = rx.TrimStart(new[] {'M', 'V'});
                     VolumeLevel = int.Parse(volumeString);
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice, "Caught an exception parsing volume response: {0}{1}",
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing volume response: {0}{1}",
                         rx, ex);
                 }
             }
@@ -350,7 +396,7 @@ namespace PDT.Plugins.Marantz
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice,
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice,
                         "Caught an exception parsing channel volume response: {0}{1}", rx, ex);
                 }
             }
@@ -377,7 +423,7 @@ namespace PDT.Plugins.Marantz
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice, "Caught an exception parsing input response: {0}{1}",
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing input response: {0}{1}",
                         rx, ex);
                 }
             }
@@ -391,7 +437,7 @@ namespace PDT.Plugins.Marantz
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice,
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice,
                         "Caught an exception parsing surround mode response: {0}{1}", rx, ex);
                 }
             }
@@ -472,6 +518,7 @@ namespace PDT.Plugins.Marantz
         {
             get { return _commsMonitor; }
         }
+
 
         public void PowerOn()
         {
@@ -653,7 +700,15 @@ namespace PDT.Plugins.Marantz
             get { return _inputs.ToDictionary(pair => pair.Key, pair => pair.Value as IInput); }
         }
 
-        public string CurrentSourceInfoKey { get; set; }
+        public string CurrentSourceInfoKey { get
+            {
+                return CurrentSourceInfo.SourceListKey;
+            }
+            set
+            {
+                // TODO: Get rid of this setter once the interface definition is updated to remove the setter requirement.
+            }
+        }
 
         public SourceListItem CurrentSourceInfo
         {
@@ -664,7 +719,6 @@ namespace PDT.Plugins.Marantz
             set
             {
                 if (value == _currentSourceItem) return;
-                CurrentSourceInfoKey = value.SourceListKey;
 
                 var handler = CurrentSourceChange;
 
@@ -721,3 +775,6 @@ namespace PDT.Plugins.Marantz
         public event DeviceInfoChangeHandler DeviceInfoChanged;
     }
 }
+
+// devjson:4 {"deviceKey":"avr", "methodName":"SendText", "params":["PW?"]}
+// setdevicestreamdebug:4 avr-com both 120
