@@ -4,7 +4,7 @@ using System;
 #if SERIES4
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 #else
-using PDT.Plugins.Marantz.Interfaces
+using PDT.Plugins.Marantz.Interfaces;
 #endif
 
 namespace PDT.Plugins.Marantz
