@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ProjectType>ProgramLibrary</ProjectType>
   </PropertyGroup>
@@ -19,6 +19,12 @@
     <PackageProjectUrl>https://github.com/PepperDash/epi-avr-marantz</PackageProjectUrl>
     <PackageTags>crestron 4series</PackageTags>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);SERIES4</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>$(DefineConstants);SERIES4</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="Properties\**" />
@@ -27,7 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="PepperDashEssentials" Version="2.0.0-alpha-2397" />
+    <PackageReference Include="PepperDashEssentials" Version="2.0.0-alpha-2401" />
   </ItemGroup>
 
 </Project>

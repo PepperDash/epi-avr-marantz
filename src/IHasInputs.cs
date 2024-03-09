@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace PDT.Plugins.Marantz
+namespace PDT.Plugins.Marantz.Interfaces
 {
     public interface IHasInputs
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using PepperDash.Core;
 
-namespace PDT.Plugins.Marantz
+namespace PDT.Plugins.Marantz.Interfaces
 {
     public interface IInput : IKeyName
     {
