@@ -10,6 +10,7 @@ using PepperDash.Essentials.Core.DeviceInfo;
 using PepperDash.Essentials.Core.Queues;
 using Feedback = PepperDash.Essentials.Core.Feedback;
 using Crestron.SimplSharpPro.CrestronThread;
+using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 
 namespace PDT.Plugins.Marantz
 {
@@ -147,7 +148,7 @@ namespace PDT.Plugins.Marantz
                 {"DVD", new MarantzInput("DVD", "DVD", this, "DVD")},
                 {"BD", new MarantzInput("BD", "BD", this, "BD")},
                 {"TV", new MarantzInput("TV", "TV", this, "TV")},
-                {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
+                {"SATCBL", new MarantzInput("SATCBL", "SAT/CBL", this, "SAT/CBL")},
                 {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
                 {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
                 {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
@@ -260,7 +261,7 @@ namespace PDT.Plugins.Marantz
             {
                 if (args.Status == MonitorStatus.IsOk)
                 {
-                    poll.Reset(25, 2000);
+                    poll.Reset(25, 10000);
                 }
                 else
                 {
@@ -479,10 +480,21 @@ namespace PDT.Plugins.Marantz
 
             if (!device.PowerIsOn) return;
 
-            device.SendText("MU?");
-            device.SendText("MS?");
-            device.SendText("SI?");
-            device.SendText("CV?");
+            CrestronInvoke.BeginInvoke((o) =>
+            {
+                Thread.Sleep(100);
+                device.SendText("MV?");
+                Thread.Sleep(100);
+                device.SendText("MU?");
+                Thread.Sleep(100);
+                device.SendText("MS?");
+                Thread.Sleep(100);
+                device.SendText("SI?");
+                Thread.Sleep(100);
+                device.SendText("CV?");
+                Thread.Sleep(100);
+                device.SendText("Z2?");
+            });
         }
 
         public override void LinkToApi(BasicTriList trilist, uint joinStart, string joinMapKey, EiscApiAdvanced bridge)

@@ -1,4 +1,6 @@
 using System;
+using PepperDash.Essentials.Core.DeviceTypeInterfaces;
+
 
 namespace PDT.Plugins.Marantz
 {
