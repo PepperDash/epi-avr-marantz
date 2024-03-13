@@ -12,6 +12,8 @@ using Feedback = PepperDash.Essentials.Core.Feedback;
 using Crestron.SimplSharpPro.CrestronThread;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 
+// TODO: Add IHasInputs and IInputs back into this repo for 3-series compatibility
+
 #if SERIES4
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 #else
@@ -47,6 +49,8 @@ namespace PDT.Plugins.Marantz
             get { return _powerIsOn; }
             set
             {
+                if(value == _powerIsOn)
+                    return;
                 _powerIsOn = value;
                 PowerIsOnFeedback.FireUpdate();
             }
@@ -59,6 +63,8 @@ namespace PDT.Plugins.Marantz
             get { return _muteIsOn; }
             set
             {
+                if (value == _muteIsOn)
+                    return;
                 _muteIsOn = value;
                 MuteFeedback.FireUpdate();
             }
@@ -71,6 +77,8 @@ namespace PDT.Plugins.Marantz
             get { return _volumeLevel; }
             set
             {
+                if (value == _volumeLevel)
+                    return;
                 _volumeLevel = value;
                 Debug.Console(2, this, " Volume Level: {0}", _volumeLevel);
                 VolumeLevelFeedback.FireUpdate();
@@ -104,6 +112,8 @@ namespace PDT.Plugins.Marantz
             get { return _currentInput; }
             set
             {
+                if (value == _currentInput)
+                    return;
                 _currentInput = value;
                 CurrentInputFeedback.FireUpdate();
             }
@@ -115,7 +125,9 @@ namespace PDT.Plugins.Marantz
         {
             get { return _currentSurroundMode; }
             set
-            {
+            {   
+                if (value == _currentSurroundMode)
+                    return;
                 _currentSurroundMode = value;
                 CurrentInputFeedback.FireUpdate();
             }
@@ -277,7 +289,7 @@ namespace PDT.Plugins.Marantz
             PowerIsOnFeedback.OutputChange += (sender, args) =>
             {
                 if (args.BoolValue)
-                    poll.Reset(25, 2000);
+                    poll.Reset(25, 10000);
             };
         }
 
