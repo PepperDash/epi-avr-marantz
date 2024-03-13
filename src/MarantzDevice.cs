@@ -12,6 +12,11 @@ using Feedback = PepperDash.Essentials.Core.Feedback;
 using Crestron.SimplSharpPro.CrestronThread;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 
+#if SERIES4
+using PepperDash.Essentials.Core.DeviceTypeInterfaces;
+#else
+using PDT.Plugins.Marantz.Interfaces;
+#endif
 namespace PDT.Plugins.Marantz
 {
     public class MarantzDevice : EssentialsBridgeableDevice, 
