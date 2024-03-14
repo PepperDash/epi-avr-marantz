@@ -11,6 +11,64 @@ using PDT.Plugins.Marantz.Interfaces;
 
 namespace PDT.Plugins.Marantz
 {
+    public class MarantzSurroundMode : ISelectableItem
+    {
+        private bool _isSelected;
+
+        private readonly string _command;
+        private readonly string _matchString;
+        private readonly MarantzDevice _parent;
+
+        public string Key { get; private set; }
+        public string Name { get; private set; }
+
+        public string Command { get
+            {
+                return _command;
+            } 
+        }
+        public string MatchString
+        {
+            get
+            {
+                return _matchString;
+            }
+        }
+
+        public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, string matchString = "")
+        {
+            Key = key;
+            Name = name;
+            _parent = parent;
+            _command = command;
+            _matchString = string.IsNullOrEmpty(matchString) ? command : matchString;
+        }
+
+        public event EventHandler IsSelectedChanged;
+
+        public bool IsSelected
+        {
+            get { return _isSelected; }
+            set
+            {
+                if (value == _isSelected)
+                    return;
+
+                _isSelected = value;
+
+                var handler = IsSelectedChanged;
+                if (handler != null)
+                    handler(this, EventArgs.Empty);  
+            }
+        }
+
+        public void Select()
+        {
+            _parent.SetSurroundMode(_command);
+        }
+    }
+
+
     public class MarantzInput : IInput
     {
         private bool _isSelected;
@@ -36,15 +94,13 @@ namespace PDT.Plugins.Marantz
             get { return _isSelected; }
             set
             {
-                var oldValue = _isSelected;
-                _isSelected = value;
+                if (value == _isSelected)
+                    return;
 
-                if (oldValue != _isSelected)
-                {
-                    var handler = InputUpdated;
-                    if (handler != null)
-                        handler(this, EventArgs.Empty);
-                }
+                _isSelected = value;
+                var handler = InputUpdated;
+                if (handler != null)
+                    handler(this, EventArgs.Empty);
             }
         }
 
