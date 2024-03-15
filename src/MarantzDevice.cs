@@ -703,7 +703,7 @@ namespace PDT.Plugins.Marantz
                 device.SendText("SI?");
                 Thread.Sleep(100);
                 device.SendText("Z2?");
-                Thread.Sleep(510000);
+                Thread.Sleep(100);
                 device.SendText("CV?");
 
             });
