@@ -1,22 +1,18 @@
-
+﻿using Newtonsoft.Json;
+using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using System;
 using System.Collections.Generic;
-using PepperDash.Essentials.Core.DeviceTypeInterfaces;
-
-
-#if SERIES4
-using PepperDash.Essentials.Core.DeviceTypeInterfaces;
-#else
-using PDT.Plugins.Marantz.Interfaces;
-#endif
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzInputs : ISelectableItems<string>
+    public class MarantzSurroundModes : ISelectableItems<eSurroundModes>
     {
-        private Dictionary<string, ISelectableItem> _items = new Dictionary<string, ISelectableItem>();
+        private Dictionary<eSurroundModes, ISelectableItem> _items = new Dictionary<eSurroundModes, ISelectableItem>();
 
-        public Dictionary<string, ISelectableItem> Items
+        public Dictionary<eSurroundModes, ISelectableItem> Items
         {
             get
             {
@@ -57,23 +53,43 @@ namespace PDT.Plugins.Marantz
 
     }
 
-    public class MarantzInput : ISelectableItem
+    public class MarantzSurroundMode : ISelectableItem
     {
         private bool _isSelected;
 
-        private readonly string _inputCommand;
+        private readonly string _command;
+        private readonly string _matchString;
         private readonly MarantzDevice _parent;
 
-        public MarantzInput(string key, string name, MarantzDevice parent, string inputCommand)
+        public string Key { get; private set; }
+        public string Name { get; private set; }
+
+        [JsonIgnore]
+        public string Command
+        {
+            get
+            {
+                return _command;
+            }
+        }
+
+        [JsonIgnore]
+        public string MatchString
+        {
+            get
+            {
+                return _matchString;
+            }
+        }
+
+        public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, string matchString = "")
         {
             Key = key;
             Name = name;
             _parent = parent;
-            _inputCommand = inputCommand;
+            _command = command;
+            _matchString = string.IsNullOrEmpty(matchString) ? command : matchString;
         }
-
-        public string Key { get; private set; }
-        public string Name { get; private set; }
 
         public event EventHandler ItemUpdated;
 
@@ -86,6 +102,7 @@ namespace PDT.Plugins.Marantz
                     return;
 
                 _isSelected = value;
+
                 var handler = ItemUpdated;
                 if (handler != null)
                     handler(this, EventArgs.Empty);
@@ -94,7 +111,7 @@ namespace PDT.Plugins.Marantz
 
         public void Select()
         {
-            _parent.SetInput(_inputCommand);
+            _parent.SetSurroundSoundMode(_command);
         }
     }
 }

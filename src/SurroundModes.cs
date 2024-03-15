@@ -33,14 +33,4 @@ namespace PDT.Plugins.Marantz
         Music,
         Game,
     }
-
-    public interface ISelectableItem: IKeyName
-    {
-        event EventHandler IsSelectedChanged;
-
-        [JsonProperty("isSelected")]
-        bool IsSelected { get; set; }
-
-        void Select();
-    }
 }

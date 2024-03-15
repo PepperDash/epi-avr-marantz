@@ -26,7 +26,7 @@ namespace PDT.Plugins.Marantz
 
             // Main volume range = 38 - 62 | 0db = 50
             VolumeLevelFeedback = new IntFeedback(_channelName + "-Volume", () =>
-                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 62, 38, int.MaxValue, int.MinValue));
+                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 620, 380, int.MaxValue, int.MinValue));
 
             MuteFeedback = new BoolFeedback(_channelName + "-Mute", () => VolumeLevelFeedback.IntValue == 0);
 
@@ -134,7 +134,10 @@ namespace PDT.Plugins.Marantz
 
         public void ParseResponse(string response)
         {
-            VolumeLevel = int.Parse(response);
+            var level = int.Parse(response);
+
+            if (response.Length <= 2) VolumeLevel = level * 10;
+            else VolumeLevel = level;
         }
 
         public string Key { get; private set; }

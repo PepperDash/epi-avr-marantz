@@ -11,6 +11,12 @@ using PepperDash.Essentials.Core.Queues;
 using Feedback = PepperDash.Essentials.Core.Feedback;
 using Crestron.SimplSharpPro.CrestronThread;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
+using PepperDash.Essentials.AppServer.Messengers;
+using PDT.Plugins.Marantz;
+using PDT.Plugins.Marantz;
+
+
+
 
 // TODO: Add IHasInputs and IInputs back into this repo for 3-series compatibility
 
@@ -21,40 +27,26 @@ using PDT.Plugins.Marantz.Interfaces;
 #endif
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzDevice : EssentialsBridgeableDevice, 
-        IOnline, 
+    public class MarantzDevice : EssentialsBridgeableDevice,
+        IOnline,
         IHasPowerControlWithFeedback,
-        IBasicVolumeWithFeedback, 
-        IRouting, 
-        ICommunicationMonitor, 
+        IBasicVolumeWithFeedback,
+        IRouting,
+        ICommunicationMonitor,
         IHasFeedback,
         IHasSurroundChannels,
-        IHasInputs,
+        IHasInputs<string, string>,
         IRoutingSinkWithSwitching,
         IDeviceInfoProvider,
-        ISurroundSoundModes
+        IHasSurroundSoundModes<eSurroundModes, string>
     {
         private readonly IBasicCommunication _comms;
         private readonly GenericCommunicationMonitor _commsMonitor;
-        private readonly IDictionary<string, MarantzInput> _inputs;
         private readonly IDictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
 
-        private Dictionary<eSurroundModes, MarantzSurroundMode> _surroundModes;
+        public ISelectableItems<eSurroundModes> SurroundSoundModes { get; private set; }
 
-        public Dictionary<eSurroundModes, MarantzSurroundMode> SurroundModes { get
-            {
-                return _surroundModes;
-            }
-            set
-            {
-                   _surroundModes = value;
-                var handler = SurroundModesUpdated;
-                if (handler != null)
-                    handler(this, EventArgs.Empty);
-            
-            }
-        }
-        public event EventHandler SurroundModesUpdated;
+        public ISelectableItems<string> Inputs { get; private set; }
 
 
         private readonly GenericQueue _receiveQueue;
@@ -69,7 +61,7 @@ namespace PDT.Plugins.Marantz
             get { return _powerIsOn; }
             set
             {
-                if(value == _powerIsOn)
+                if (value == _powerIsOn)
                     return;
                 _powerIsOn = value;
                 PowerIsOnFeedback.FireUpdate();
@@ -125,101 +117,74 @@ namespace PDT.Plugins.Marantz
             }
         }
 
-        private string _currentInput;
+        //private string _currentSurroundMode;
 
-        public string CurrentInput
-        {
-            get { return _currentInput; }
-            set
-            {
-                if (value == _currentInput)
-                    return;
-                _currentInput = value;
-                CurrentInputFeedback.FireUpdate();
-            }
-        }
+        //public string CurrentSurroundMode
+        //{
+        //    get { return _currentSurroundMode; }
+        //    set
+        //    {   
+        //        if (value == _currentSurroundMode)
+        //            return;
+        //        _currentSurroundMode = value;
 
-        private string _currentSurroundMode;
+        //        var handler = SurroundModeChanged;
+        //        if (handler != null)
+        //            handler(this, EventArgs.Empty);
+        //    }
+        //}
 
-        public string CurrentSurroundMode
-        {
-            get { return _currentSurroundMode; }
-            set
-            {   
-                if (value == _currentSurroundMode)
-                    return;
-                _currentSurroundMode = value;
-
-                var handler = SurroundModeChanged;
-                if (handler != null)
-                    handler(this, EventArgs.Empty);
-            }
-        }
-
-        public event EventHandler SurroundModeChanged;
+        //public event EventHandler SurroundModeChanged;
 
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
         {
-            _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
-
-            DeviceInfo = new DeviceInfo();
-
-            _surroundChannels = new Dictionary<SurroundChannel, MarantzChannelVolume>();
-
-            _comms = comms;
-
-            var socket = _comms as ISocketStatus;
-            if (socket != null)
+            try
             {
-                socket.ConnectionChange += OnSocketConnectionChange;
+                _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
+
+                DeviceInfo = new DeviceInfo();
+
+                _surroundChannels = new Dictionary<SurroundChannel, MarantzChannelVolume>();
+
+                _comms = comms;
+
+                var socket = _comms as ISocketStatus;
+                if (socket != null)
+                {
+                    socket.ConnectionChange += OnSocketConnectionChange;
+                }
+
+                var monitorConfig = config.Monitor ?? new CommunicationMonitorConfig()
+                {
+                    PollString = "PW?" + CommsDelimiter,
+                    PollInterval = 30000,
+                    TimeToWarning = 60000,
+                    TimeToError = 120000
+                };
+
+                _commsMonitor = new GenericCommunicationMonitor(this, comms, monitorConfig);
+
+                SetupInputs();
+
+                SetupDefaultSurroundModes();
+
+                SetupSurroundChannels();
+
+                SetupGather();
+
+                SetupRoutingPorts();
+
+                SetupFeedbacks();
+
+                SetupPolling();
+
+                SetupConsoleCommands();
             }
-
-            var monitorConfig = config.Monitor ?? new CommunicationMonitorConfig()
+            catch (Exception e)
             {
-                PollString = "PW?" + CommsDelimiter,
-                PollInterval = 30000,
-                TimeToWarning = 60000,
-                TimeToError = 120000
-            };
-
-            _commsMonitor = new GenericCommunicationMonitor(this, comms, monitorConfig);
-
-            _inputs = new Dictionary<string, MarantzInput>
-            {
-                {"DVD", new MarantzInput("DVD", "DVD", this, "DVD")},
-                {"BD", new MarantzInput("BD", "BD", this, "BD")},
-                {"TV", new MarantzInput("TV", "TV", this, "TV")},
-                {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
-                {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
-                {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
-                {"8K", new MarantzInput("8K", "8K", this, "8K")},
-                {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
-                {"AUX2", new MarantzInput("AUX2", "AUX2", this, "AUX2")},
-                {"AUX3", new MarantzInput("AUX3", "AUX3", this, "AUX3")},
-                {"AUX4", new MarantzInput("AUX4", "AUX4", this, "AUX4")},
-                {"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
-                {"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
-                {"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
-                {"CD", new MarantzInput("CD", "CD", this, "CD")},
-                {"PHONO", new MarantzInput("PHONO", "PHONO", this, "PHONO")},
-                {"TUNER", new MarantzInput("TUNER", "TUNER", this, "TUNER")},
-                {"HDRADIO", new MarantzInput("HDRADIO", "HDRADIO", this, "HDRADIO")},
-                {"NET", new MarantzInput("NET", "NET", this, "NET")},
-                {"BT", new MarantzInput("BT", "BT", this, "BT")},
-            };
-
-            SetupDefaultSurroundModes();
-
-            SetupGather();
-
-            SetupRoutingPorts();
-
-            SetupFeedbacks();
-
-            SetupPolling();
-
-            SetupConsoleCommands();
+                Debug.Console(0, this, "Error in the constructor: {0}", e);
+            }
         }
 
         public override bool CustomActivate()
@@ -232,53 +197,156 @@ namespace PDT.Plugins.Marantz
                 return base.CustomActivate();
             }
 
-            var surroundMessenger = new ISurroundSoundModesMessenger(string.Format("surroundModesMessenger-{0}", Key), string.Format("/device/{0}", Key), this);
-
+            var surroundMessenger = new ISelectableItemsMessenger<eSurroundModes>
+                (string.Format("{0}-surroundSoundModes-plugin", Key),
+                string.Format("/device/{0}", Key),
+                this.SurroundSoundModes, "surroundSoundModes");
             mc.AddDeviceMessenger(surroundMessenger);
 
+            var surroundChannelsMessenger = new ISurroundChannelsMessenger
+                (string.Format("{0}-surroundChannels-plugin", Key),
+                               string.Format("/device/{0}", Key),
+                                              this);
+            mc.AddDeviceMessenger(surroundChannelsMessenger);
+
+            // Inputs messenger should be automatically added by the MC plugin
+
             return base.CustomActivate();
+        }
+
+        /// <summary>
+        /// Attempts to add a messenger for the surround channel
+        /// </summary>
+        /// <param name="channel"></param>
+        private void AddSurroundChannelMessenger(SurroundChannel channel)
+        {
+            try
+            {
+                var mc = DeviceManager.AllDevices.OfType<IMobileControl>().FirstOrDefault();
+
+                if (mc == null)
+                {
+                    return;
+                }
+
+                if (_surroundChannels.TryGetValue(channel, out var channelValue))
+                {
+                    var channelMessenger = new DeviceVolumeMessenger(
+                        string.Format("{0}-{1}-channelVolume-plugin", Key, channel.ToString()),
+                        string.Format("/device/{0}/{1}", Key, channel.ToString()),
+                        channelValue);
+                    mc.AddDeviceMessenger(channelMessenger);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.Console(0, this, "Error adding channel volume messengers: {0}", e);
+            }
+        }
+
+        private void SetupInputs()
+        {
+            Inputs = new MarantzInputs
+            {
+                Items = new Dictionary<string, ISelectableItem>
+                {
+                    {"DVD", new MarantzInput("DVD", "DVD", this, "DVD")},
+                    {"BD", new MarantzInput("BD", "BD", this, "BD")},
+                    {"TV", new MarantzInput("TV", "TV", this, "TV")},
+                    {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
+                    {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
+                    {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
+                    {"8K", new MarantzInput("8K", "8K", this, "8K")},
+                    {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
+                    {"AUX2", new MarantzInput("AUX2", "AUX2", this, "AUX2")},
+                    //{"AUX3", new MarantzInput("AUX3", "AUX3", this, "AUX3")},
+                    //{"AUX4", new MarantzInput("AUX4", "AUX4", this, "AUX4")},
+                    //{"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
+                    //{"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
+                    //{"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
+                    {"CD", new MarantzInput("CD", "CD", this, "CD")},
+                    //{"PHONO", new MarantzInput("PHONO", "PHONO", this, "PHONO")},
+                    //{"TUNER", new MarantzInput("TUNER", "TUNER", this, "TUNER")},
+                    //{"HDRADIO", new MarantzInput("HDRADIO", "HDRADIO", this, "HDRADIO")},
+                    {"NET", new MarantzInput("NET", "NET", this, "NET")},
+                    {"BT", new MarantzInput("BT", "BT", this, "BT")},
+                }
+            };
+        }
+
+        private void SetupSurroundChannels()
+        {
+            //_surroundChannels.Add(SurroundChannel.FrontLeft, new MarantzChannelVolume("FL", this));
+            //_surroundChannels.Add(SurroundChannel.FrontRight, new MarantzChannelVolume("FR", this));
+            //_surroundChannels.Add(SurroundChannel.Center, new MarantzChannelVolume("C", this));
+            //_surroundChannels.Add(SurroundChannel.SurroundLeft, new MarantzChannelVolume("SL", this));
+            //_surroundChannels.Add(SurroundChannel.SurroundRight, new MarantzChannelVolume("SR", this));
+            //_surroundChannels.Add(SurroundChannel.SurroundBackLeft, new MarantzChannelVolume("SBL", this));
+            //_surroundChannels.Add(SurroundChannel.SurroundBackRight, new MarantzChannelVolume("SBR", this));
+            //_surroundChannels.Add(SurroundChannel.Subwoofer, new MarantzChannelVolume("SW", this));
+            //_surroundChannels.Add(SurroundChannel.Subwoofer2, new MarantzChannelVolume("SW2", this));
+            //_surroundChannels.Add(SurroundChannel.FrontDolbyLeft, new MarantzChannelVolume("FDL", this));
+            //_surroundChannels.Add(SurroundChannel.FrontDolbyRight, new MarantzChannelVolume("FDR", this));
+            //_surroundChannels.Add(SurroundChannel.SurroundDolbyLeft, new MarantzChannelVolume("SDL", this));
+            //_surroundChannels.Add(SurroundChannel.SurroundDolbyRight, new MarantzChannelVolume("SDR", this));
+            //_surroundChannels.Add(SurroundChannel.BackDolbyLeft, new MarantzChannelVolume("BDL", this));
+            //_surroundChannels.Add(SurroundChannel.BackDolbyRight, new MarantzChannelVolume("BDR", this));
+            //_surroundChannels.Add(SurroundChannel.CenterHeight, new MarantzChannelVolume("CH", this));
+        }
+
+        public void SetDefaultChannelLevels()
+        {
+            SendText("CVZRL");
         }
 
         private void SetupDefaultSurroundModes()
         {
             // Denon AVR-2311CI Surround Modes
-            SurroundModes = new Dictionary<eSurroundModes, MarantzSurroundMode>
+            SurroundSoundModes = new MarantzSurroundModes
             {
-                {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
-                {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
-                {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
-                {eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
-                {eSurroundModes.Matrix, new MarantzSurroundMode(eSurroundModes.Matrix.ToString(), "Matrix", this, "MATRIX")},
-                {eSurroundModes.MonoMovie, new MarantzSurroundMode(eSurroundModes.MonoMovie.ToString(), "Mono Movie", this, "MONO MOVIE")},
-                {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
-                {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
-                {eSurroundModes.RockArena, new MarantzSurroundMode(eSurroundModes.RockArena.ToString(), "Rock Arena", this, "ROCK ARENA")},
-                {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
-                {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
-                {eSurroundModes.VideoGame, new MarantzSurroundMode(eSurroundModes.VideoGame.ToString(), "Video Game", this, "VIDEO GAME")},
-                {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
+
+                Items = new Dictionary<eSurroundModes, ISelectableItem>
+                {
+                    {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
+                    {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
+                    {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
+                    //{eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
+                    {eSurroundModes.Matrix, new MarantzSurroundMode(eSurroundModes.Matrix.ToString(), "Matrix", this, "MATRIX")},
+                    //{eSurroundModes.MonoMovie, new MarantzSurroundMode(eSurroundModes.MonoMovie.ToString(), "Mono Movie", this, "MONO MOVIE")},
+                    {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
+                    {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
+                    //{eSurroundModes.RockArena, new MarantzSurroundMode(eSurroundModes.RockArena.ToString(), "Rock Arena", this, "ROCK ARENA")},
+                    {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
+                    {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
+                    {eSurroundModes.VideoGame, new MarantzSurroundMode(eSurroundModes.VideoGame.ToString(), "Video Game", this, "VIDEO GAME")},
+                    {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
+                }
             };
 
             // Marants SR8015 Surround Modes
-            //SurroundModes = new Dictionary<eSurroundModes, MarantzSurroundMode>
+            //SurroundSoundModes = new MarantzSurroundModes
             //{
-            //    {eSurroundModes.Auro2DSurround, new MarantzSurroundMode(eSurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR")},
-            //    {eSurroundModes.Auro3D, new MarantzSurroundMode(eSurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D")},
-            //    {eSurroundModes.Auto, new MarantzSurroundMode(eSurroundModes.Auto.ToString(), "Auto", this, "AUTO")},
-            //    {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
-            //    {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
-            //    {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
-            //    {eSurroundModes.Game, new MarantzSurroundMode(eSurroundModes.Game.ToString(), "Game", this, "GAME")},
-            //    {eSurroundModes.Left, new MarantzSurroundMode(eSurroundModes.Left.ToString(), "Left", this, "LEFT")},
-            //    {eSurroundModes.Movie, new MarantzSurroundMode(eSurroundModes.Movie.ToString(), "Movie", this, "MOVIE")},
-            //    {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
-            //    {eSurroundModes.Music, new MarantzSurroundMode(eSurroundModes.Music.ToString(), "Music", this, "MUSIC")},
-            //    {eSurroundModes.Neural, new MarantzSurroundMode(eSurroundModes.Neural.ToString(), "Neural", this, "NEURAL")},
-            //    {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
-            //    {eSurroundModes.Right, new MarantzSurroundMode(eSurroundModes.Right.ToString(), "Right", this, "RIGHT")}
-            //    {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
-            //    {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
-            //    {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")},
+
+            //    Items = new Dictionary<eSurroundModes, ISelectableItem>
+            //    {
+            //        {eSurroundModes.Auro2DSurround, new MarantzSurroundMode(eSurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR")},
+            //        {eSurroundModes.Auro3D, new MarantzSurroundMode(eSurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D")},
+            //        {eSurroundModes.Auto, new MarantzSurroundMode(eSurroundModes.Auto.ToString(), "Auto", this, "AUTO")},
+            //        {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
+            //        {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
+            //        {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
+            //        {eSurroundModes.Game, new MarantzSurroundMode(eSurroundModes.Game.ToString(), "Game", this, "GAME")},
+            //        {eSurroundModes.Left, new MarantzSurroundMode(eSurroundModes.Left.ToString(), "Left", this, "LEFT")},
+            //        {eSurroundModes.Movie, new MarantzSurroundMode(eSurroundModes.Movie.ToString(), "Movie", this, "MOVIE")},
+            //        {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
+            //        {eSurroundModes.Music, new MarantzSurroundMode(eSurroundModes.Music.ToString(), "Music", this, "MUSIC")},
+            //        {eSurroundModes.Neural, new MarantzSurroundMode(eSurroundModes.Neural.ToString(), "Neural", this, "NEURAL")},
+            //        {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
+            //        {eSurroundModes.Right, new MarantzSurroundMode(eSurroundModes.Right.ToString(), "Right", this, "RIGHT")}
+            //        {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
+            //        {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
+            //        {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")},
+            //    }
             //};
         }
 
@@ -352,7 +420,7 @@ namespace PDT.Plugins.Marantz
                         PowerOff();
                         break;
                     case "input?":
-                        CrestronConsole.ConsoleCommandResponse("{0}", CurrentInput);
+                        CrestronConsole.ConsoleCommandResponse("{0}", Inputs.CurrentItem);
                         break;
                     case "power?":
                         CrestronConsole.ConsoleCommandResponse("{0}", PowerIsOn);
@@ -393,19 +461,18 @@ namespace PDT.Plugins.Marantz
 
             // Main volume range = 0 - 98
             VolumeLevelFeedback = new IntFeedback("Volume", () =>
-                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 98, 0, 65535, 0));
+                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 980, 0, 65535, 0));
 
             MuteFeedback = new BoolFeedback("Mute", () => MuteIsOn);
 
-            CurrentInputFeedback = new StringFeedback("Input", () => CurrentInput);
+            //CurrentInputFeedback = new StringFeedback("Input", () => Inputs.CurrentItem);
 
-            CurrentSurroundModeStringFeedback = new StringFeedback("Surround Mode", () => CurrentSurroundMode);
+            //CurrentSurroundModeStringFeedback = new StringFeedback("Surround Mode", () => CurrentSurroundMode);
 
             Feedbacks = new FeedbackCollection<Feedback>
             {
                 PowerIsOnFeedback,
                 MuteFeedback,
-                CurrentInputFeedback,
                 IsOnline,
             };
 
@@ -471,7 +538,12 @@ namespace PDT.Plugins.Marantz
                 try
                 { 
                     var volumeString = rx.Substring(2).Trim();
-                    VolumeLevel = int.Parse(volumeString);
+                    var level = int.Parse(volumeString);
+
+                    // Multiply 2 digit values by 10
+                    if (volumeString.Length <= 2) VolumeLevel = level * 10;
+                    else VolumeLevel = level;
+                        
                 }
                 catch (Exception ex)
                 {
@@ -500,6 +572,7 @@ namespace PDT.Plugins.Marantz
                     {
                         channel = new MarantzChannelVolume(channelName, this);
                         _surroundChannels.Add(surroundChannel, channel);
+                        AddSurroundChannelMessenger(surroundChannel);
 
                         var handler = SurroundChannelsUpdated;
                         if (handler != null)
@@ -521,20 +594,16 @@ namespace PDT.Plugins.Marantz
                 {
                     var input = rx.Substring(2).Trim();
 
-                    if (_inputs.ContainsKey(input))
+                    if (Inputs.Items.ContainsKey(input))
                     {
 
-                        foreach (var item in _inputs)
+                        foreach (var item in Inputs.Items)
                         {
                             item.Value.IsSelected = item.Key.Equals(input);
                         }
-
-                        var handler = InputsUpdated;
-                        if (handler != null)
-                            handler(this, EventArgs.Empty);
                     }
 
-                    CurrentInput = input;
+                    Inputs.CurrentItem = input;
                 }
                 catch (Exception ex)
                 {
@@ -549,44 +618,31 @@ namespace PDT.Plugins.Marantz
                 {
                     var surroundMode = rx.Substring(2);
 
-                    Debug.Console(2, this, "surroundMode: {0}", surroundMode);
+                    //Debug.Console(2, this, "surroundMode: {0}", surroundMode);
 
                     var matchString = surroundMode;
 
-                    Debug.Console(2, this, "matchString: {0}", matchString);
+                    //Debug.Console(2, this, "matchString: {0}", matchString);
 
-                    var mode = _surroundModes.FirstOrDefault(x => matchString.Contains(x.Value.MatchString)).Value;
+                    var mode = SurroundSoundModes.Items.FirstOrDefault
+                        (x => matchString.StartsWith(((x.Value) as MarantzSurroundMode).MatchString)).Value;
 
                     // TODO: This is matching PURE DIRECT as DIRECT
 
-                    // If we didn't find a match, try to match the prefix to the mode match string
-                    //if (mode == null)
-                    //{
-                    //    if (surroundMode.Contains(" "))
-                    //    {
-
-                    //        Debug.Console(2, this, "matchString prefix: {0}", matchString);
-                    //    }
-
-                    //    mode = _surroundModes.FirstOrDefault(x => x.Value.MatchString.Equals(matchString)).Value;
-                    //}
-
-
-                    if (mode != null && _surroundModes.ContainsValue(mode))
+                    if (mode != null && SurroundSoundModes.Items.ContainsValue(mode))
                     {
                         // must set this first, as the mode select will fire an event
-                        CurrentSurroundMode = surroundMode;
+                        SurroundSoundModes.CurrentItem = surroundMode;
 
-                        foreach (var item in _surroundModes)
+                        foreach (var item in SurroundSoundModes.Items)
                         {
                             var isSelected = item.Value.Equals(mode);
-                            Debug.Console(2, this, "Setting {0} isSelected: to {1}", item.Key.ToString(), isSelected);
                             item.Value.IsSelected = isSelected;
                         }
 ;                    } else
                     {
-                        CurrentSurroundMode = "Unknown";
-                        _surroundModes.All(x => x.Value.IsSelected = false);
+                        SurroundSoundModes.CurrentItem = "Unknown";
+                        SurroundSoundModes.Items.All(x => x.Value.IsSelected = false);
                         Debug.Console(2, this, "Unknown Surround Mode: {0}", surroundMode);
                     }
 
@@ -646,9 +702,10 @@ namespace PDT.Plugins.Marantz
                 Thread.Sleep(100);
                 device.SendText("SI?");
                 Thread.Sleep(100);
-                device.SendText("CV?");
-                Thread.Sleep(100);
                 device.SendText("Z2?");
+                Thread.Sleep(510000);
+                device.SendText("CV?");
+
             });
         }
 
@@ -814,7 +871,7 @@ namespace PDT.Plugins.Marantz
             SendText("SI?");
         }
 
-        public void SetSurroundMode(string surroundMode)
+        public void SetSurroundSoundMode(string surroundMode)
         {
             var surroundModeToSend = "MS" + surroundMode.Trim().ToUpper();
             SendText(surroundModeToSend);
@@ -824,7 +881,7 @@ namespace PDT.Plugins.Marantz
 
         public BoolFeedback MuteFeedback { get; private set; }
         public IntFeedback VolumeLevelFeedback { get; private set; }
-        public StringFeedback CurrentInputFeedback { get; private set; }
+        //public StringFeedback CurrentInputFeedback { get; private set; }
         public StringFeedback CurrentSurroundModeStringFeedback { get; private set; }
 
         public RoutingPortCollection<RoutingInputPort> InputPorts { get; private set; }
@@ -863,14 +920,6 @@ namespace PDT.Plugins.Marantz
                 return _surroundChannels.ToDictionary(pair => pair.Key, pair => pair.Value as IBasicVolumeWithFeedback);
             }
         }
-
-        public event EventHandler InputsUpdated;
-
-        public IDictionary<string, IInput> Inputs
-        {
-            get { return _inputs.ToDictionary(pair => pair.Key, pair => pair.Value as IInput); }
-        }
-
 
         public string CurrentSourceInfoKey { get
             {
