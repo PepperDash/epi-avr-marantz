@@ -13,7 +13,7 @@ namespace PDT.Plugins.Marantz
     {
         event EventHandler SurroundChannelsUpdated;
         [JsonProperty("surroundChannels")]
-        IDictionary<SurroundChannel, IBasicVolumeWithFeedback> Channels { get; }
+        Dictionary<SurroundChannel, IBasicVolumeWithFeedback> SurroundChannels { get; }
 
         void SetDefaultChannelLevels();
     }

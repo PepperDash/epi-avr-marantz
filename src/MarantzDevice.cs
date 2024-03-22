@@ -12,9 +12,7 @@ using Feedback = PepperDash.Essentials.Core.Feedback;
 using Crestron.SimplSharpPro.CrestronThread;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using PepperDash.Essentials.AppServer.Messengers;
-using PDT.Plugins.Marantz;
-using PDT.Plugins.Marantz;
-
+using System.Reflection.Emit;
 
 
 
@@ -30,7 +28,7 @@ namespace PDT.Plugins.Marantz
     public class MarantzDevice : EssentialsBridgeableDevice,
         IOnline,
         IHasPowerControlWithFeedback,
-        IBasicVolumeWithFeedback,
+        IBasicVolumeWithFeedbackAdvanced,
         IRouting,
         ICommunicationMonitor,
         IHasFeedback,
@@ -42,7 +40,7 @@ namespace PDT.Plugins.Marantz
     {
         private readonly IBasicCommunication _comms;
         private readonly GenericCommunicationMonitor _commsMonitor;
-        private readonly IDictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
+        private readonly Dictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
 
         public ISelectableItems<eSurroundModes> SurroundSoundModes { get; private set; }
 
@@ -84,6 +82,9 @@ namespace PDT.Plugins.Marantz
 
         private int _volumeLevel;
 
+        /// <summary>
+        /// Volume level from 0 - 980
+        /// </summary>
         public int VolumeLevel
         {
             get { return _volumeLevel; }
@@ -95,6 +96,22 @@ namespace PDT.Plugins.Marantz
                 Debug.Console(2, this, " Volume Level: {0}", _volumeLevel);
                 VolumeLevelFeedback.FireUpdate();
             }
+        }
+
+        /// <summary>
+        /// The raw decimal volume of the channel from -80dB (-800) to 18dB (180) in decibels
+        /// </summary>
+        public int RawVolumeLevel
+        {
+            get
+            {
+                return CrestronEnvironment.ScaleWithLimits(VolumeLevel, 980, 0, 180, -800);
+            }
+        }
+
+        public eVolumeLevelUnits Units
+        {
+            get { return eVolumeLevelUnits.Decibels; }
         }
 
         private int _maxVolLevel;
@@ -169,7 +186,7 @@ namespace PDT.Plugins.Marantz
 
                 SetupDefaultSurroundModes();
 
-                SetupSurroundChannels();
+                //SetupSurroundChannels();
 
                 SetupGather();
 
@@ -197,17 +214,17 @@ namespace PDT.Plugins.Marantz
                 return base.CustomActivate();
             }
 
-            var surroundMessenger = new ISelectableItemsMessenger<eSurroundModes>
+            var surroundModeMessenger = new ISelectableItemsMessenger<eSurroundModes>
                 (string.Format("{0}-surroundSoundModes-plugin", Key),
                 string.Format("/device/{0}", Key),
                 this.SurroundSoundModes, "surroundSoundModes");
-            mc.AddDeviceMessenger(surroundMessenger);
+            mc.AddDeviceMessenger(surroundModeMessenger);
 
-            var surroundChannelsMessenger = new ISurroundChannelsMessenger
+            var surroundChannelMessenger = new ISurroundChannelsMessenger
                 (string.Format("{0}-surroundChannels-plugin", Key),
                                string.Format("/device/{0}", Key),
                                               this);
-            mc.AddDeviceMessenger(surroundChannelsMessenger);
+            mc.AddDeviceMessenger(surroundChannelMessenger);
 
             // Inputs messenger should be automatically added by the MC plugin
 
@@ -572,7 +589,6 @@ namespace PDT.Plugins.Marantz
                     {
                         channel = new MarantzChannelVolume(channelName, this);
                         _surroundChannels.Add(surroundChannel, channel);
-                        AddSurroundChannelMessenger(surroundChannel);
 
                         var handler = SurroundChannelsUpdated;
                         if (handler != null)
@@ -786,14 +802,18 @@ namespace PDT.Plugins.Marantz
 
         private static void RampVolumeUp(object state)
         {
+            Debug.LogMessage(Serilog.Events.LogEventLevel.Debug, "ramping volume up...");
+
             var device = (MarantzDevice) state;
+
+            Debug.LogMessage(Serilog.Events.LogEventLevel.Debug, "Volume Level: {0}", device.VolumeLevel);
 
             using (var wh = new CEvent(true, false))
             {
                 var level = device.VolumeLevel;
-                while (device._rampVolumeUp && level < 99)
+                while (device._rampVolumeUp && level < 980)
                 {
-                    var newLevel = ++level;
+                    var newLevel = level + 5;
                     var request = MarantzUtils.VolumeCommand(newLevel);
                     device.SendText(request);
                     wh.Wait(50);
@@ -819,15 +839,19 @@ namespace PDT.Plugins.Marantz
 
         private static void RampVolumeDown(object state)
         {
+            Debug.Console(2, "ramping volume down...");
+
             var device = (MarantzDevice) state;
+
+            Debug.Console(2, "Volume Level: {0}", device.VolumeLevel);
 
             using (var wh = new CEvent(true, false))
             {
                 var level = device.VolumeLevel;
-                while (device._rampVolumeDown && level > 1)
+                while (device._rampVolumeDown && level > 0)
                 {
-                    --level;
-                    var request = MarantzUtils.VolumeCommand(level);
+                    var newLevel = level - 5;
+                    var request = MarantzUtils.VolumeCommand(newLevel);
                     device.SendText(request);
                     wh.Wait(50);
                 }
@@ -858,7 +882,7 @@ namespace PDT.Plugins.Marantz
 
         public void SetVolume(ushort level)
         {
-            var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, uint.MaxValue, uint.MinValue, 98, 0);
+            var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, 65535, 0, 980, 0);
             var request = MarantzUtils.VolumeCommand((int) desiredLevel);
             SendText(request);
         }
@@ -913,7 +937,7 @@ namespace PDT.Plugins.Marantz
 
         public event EventHandler SurroundChannelsUpdated;
 
-        public IDictionary<SurroundChannel, IBasicVolumeWithFeedback> Channels
+        public Dictionary<SurroundChannel, IBasicVolumeWithFeedback> SurroundChannels
         {
             get
             {           
@@ -1000,3 +1024,6 @@ namespace PDT.Plugins.Marantz
 // devjson:4 {"deviceKey":"avr", "methodName":"SendText", "params":["PW?"]}
 // setdevicestreamdebug:4 avr-com both 120
 // appdebug:4 2
+// devjson:4 {"deviceKey":"avr", "methodName":"SetVolume", "params":[1000]}
+// devjson:4 {"deviceKey":"avr", "methodName":"SendText", "params":["MV09"]}
+// devjson:4 { "deviceKey":"avr", "methodName":"SendText", "params":["CVFL 50"]}
