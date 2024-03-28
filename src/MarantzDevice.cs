@@ -13,6 +13,10 @@ using Crestron.SimplSharpPro.CrestronThread;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using PepperDash.Essentials.AppServer.Messengers;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
+using System.Diagnostics.Eventing.Reader;
+
+
 
 
 
@@ -36,7 +40,8 @@ namespace PDT.Plugins.Marantz
         IHasInputs<string, string>,
         IRoutingSinkWithSwitching,
         IDeviceInfoProvider,
-        IHasSurroundSoundModes<eSurroundModes, string>
+        IHasSurroundSoundModes<eSurroundModes, string>,
+        IWarmingCooling
     {
         private readonly IBasicCommunication _comms;
         private readonly GenericCommunicationMonitor _commsMonitor;
@@ -63,6 +68,33 @@ namespace PDT.Plugins.Marantz
                     return;
                 _powerIsOn = value;
                 PowerIsOnFeedback.FireUpdate();
+                if (_powerIsOn)
+                {
+                    _isWarmingUp = false;
+                    IsWarmingUpFeedback.FireUpdate();
+                }
+                else
+                {
+                    _isCoolingDown = false;
+                    IsCoolingDownFeedback.FireUpdate();
+                    VolumeLevel = 0;
+
+                    // Clear out any FB that is invalid when the unit is off
+                    CurrentSourceInfoKey = null;
+                    CurrentSourceInfo = null;
+
+                    MuteIsOn = false;
+
+                    foreach (var item in Inputs.Items)
+                    {
+                        item.Value.IsSelected = false;
+                    }
+
+                    foreach (var item in SurroundSoundModes.Items)
+                    {
+                        item.Value.IsSelected = false;
+                    }
+                }
             }
         }
 
@@ -133,25 +165,6 @@ namespace PDT.Plugins.Marantz
                 _minVolLevel = value;
             }
         }
-
-        //private string _currentSurroundMode;
-
-        //public string CurrentSurroundMode
-        //{
-        //    get { return _currentSurroundMode; }
-        //    set
-        //    {   
-        //        if (value == _currentSurroundMode)
-        //            return;
-        //        _currentSurroundMode = value;
-
-        //        var handler = SurroundModeChanged;
-        //        if (handler != null)
-        //            handler(this, EventArgs.Empty);
-        //    }
-        //}
-
-        //public event EventHandler SurroundModeChanged;
 
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
@@ -763,11 +776,29 @@ namespace PDT.Plugins.Marantz
         public void PowerOn()
         {
             SendText("PWON");
+
+            _isWarmingUp = true;
+            IsWarmingUpFeedback.FireUpdate();
+
+            _warmupTimer = new CTimer(o =>
+            {
+                _isWarmingUp = false;
+                IsWarmingUpFeedback.FireUpdate();
+            }, null, _warmingTimeMs);
         }
 
         public void PowerOff()
         {
             SendText("PWSTANDBY");
+
+            _isCoolingDown = true;
+            IsCoolingDownFeedback.FireUpdate();
+
+            _cooldownTimer = new CTimer(o =>
+            {
+                _isCoolingDown = false;
+                IsCoolingDownFeedback.FireUpdate();
+            }, null, _coolingTimeMs);
         }
 
         public void PowerToggle()
@@ -983,10 +1014,32 @@ namespace PDT.Plugins.Marantz
 
         public void ExecuteSwitch(object inputSelector)
         {
+
+            var inputToSend = (string)inputSelector;
+
             try
             {
-                var inputToSend = (string)inputSelector;
-                SetInput(inputToSend);
+                if (_powerIsOn)
+                {
+                    SetInput(inputToSend);
+                    return;
+                }
+
+
+                // One-time event handler to wait for power on before executing switch
+                EventHandler<FeedbackEventArgs> handler = null; // necessary to allow reference inside lambda to handler
+                handler = (o, a) =>
+                {
+                    if (_isWarmingUp)
+                    {
+                        return;
+                    }
+
+                    IsWarmingUpFeedback.OutputChange -= handler;
+                    SetInput(inputToSend);
+                };
+                IsWarmingUpFeedback.OutputChange += handler; // attach and wait for on FB
+                PowerOn();
             }
             catch (Exception ex)
             {
@@ -1017,10 +1070,28 @@ namespace PDT.Plugins.Marantz
 
         public DeviceInfo DeviceInfo { get; private set; }
 
+        private int _warmingTimeMs = 5000;
+
+        private int _coolingTimeMs = 2000;
+
+        private bool _isWarmingUp;
+
+        private bool _isCoolingDown;
+
+        private CTimer _warmupTimer;
+
+        private CTimer _cooldownTimer;
+
+        public BoolFeedback IsWarmingUpFeedback => throw new NotImplementedException();
+
+        public BoolFeedback IsCoolingDownFeedback => throw new NotImplementedException();
+
         public event DeviceInfoChangeHandler DeviceInfoChanged;
     }
 }
 
+
+// Useful consol commands for testing
 // devjson:4 {"deviceKey":"avr", "methodName":"SendText", "params":["PW?"]}
 // setdevicestreamdebug:4 avr-com both 120
 // appdebug:4 2
