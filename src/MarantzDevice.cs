@@ -1,29 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Crestron.SimplSharp;
+﻿using Crestron.SimplSharp;
+using Crestron.SimplSharpPro.CrestronThread;
 using Crestron.SimplSharpPro.DeviceSupport;
 using PepperDash.Core;
+using PepperDash.Essentials.AppServer.Messengers;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
 using PepperDash.Essentials.Core.DeviceInfo;
-using PepperDash.Essentials.Core.Queues;
-using Feedback = PepperDash.Essentials.Core.Feedback;
-using Crestron.SimplSharpPro.CrestronThread;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
-using PepperDash.Essentials.AppServer.Messengers;
-using System.Reflection.Emit;
-using System.Runtime.InteropServices;
-using System.Diagnostics.Eventing.Reader;
-
-
-
+using PepperDash.Essentials.Core.Queues;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Feedback = PepperDash.Essentials.Core.Feedback;
 
 
 // TODO: Add IHasInputs and IInputs back into this repo for 3-series compatibility
 
 #if SERIES4
-using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 #else
 using PDT.Plugins.Marantz.Interfaces;
 #endif
@@ -327,6 +320,12 @@ namespace PDT.Plugins.Marantz
         public void SetDefaultChannelLevels()
         {
             SendText("CVZRL");
+
+            // OR on older models
+            //foreach (var channel in _surroundChannels)
+            //{
+            //    channel.Value.SetVolume(500);
+            //}
         }
 
         private void SetupDefaultSurroundModes()
@@ -495,15 +494,18 @@ namespace PDT.Plugins.Marantz
 
             MuteFeedback = new BoolFeedback("Mute", () => MuteIsOn);
 
-            //CurrentInputFeedback = new StringFeedback("Input", () => Inputs.CurrentItem);
+            IsCoolingDownFeedback = new BoolFeedback("IsCoolingDown", () => _isCoolingDown);
+            IsWarmingUpFeedback = new BoolFeedback("IsWarmingUp", () => _isWarmingUp);
 
-            //CurrentSurroundModeStringFeedback = new StringFeedback("Surround Mode", () => CurrentSurroundMode);
 
             Feedbacks = new FeedbackCollection<Feedback>
             {
                 PowerIsOnFeedback,
                 MuteFeedback,
                 IsOnline,
+                IsCoolingDownFeedback,
+                IsWarmingUpFeedback,
+                VolumeLevelFeedback,
             };
 
             Feedbacks.Where(f => !string.IsNullOrEmpty(f.Key))
@@ -784,7 +786,7 @@ namespace PDT.Plugins.Marantz
             {
                 _isWarmingUp = false;
                 IsWarmingUpFeedback.FireUpdate();
-            }, null, _warmingTimeMs);
+            }, _warmingTimeMs);
         }
 
         public void PowerOff()
@@ -798,7 +800,7 @@ namespace PDT.Plugins.Marantz
             {
                 _isCoolingDown = false;
                 IsCoolingDownFeedback.FireUpdate();
-            }, null, _coolingTimeMs);
+            }, _coolingTimeMs);
         }
 
         public void PowerToggle()
@@ -1082,9 +1084,9 @@ namespace PDT.Plugins.Marantz
 
         private CTimer _cooldownTimer;
 
-        public BoolFeedback IsWarmingUpFeedback => throw new NotImplementedException();
+        public BoolFeedback IsWarmingUpFeedback { get; private set; }
 
-        public BoolFeedback IsCoolingDownFeedback => throw new NotImplementedException();
+        public BoolFeedback IsCoolingDownFeedback { get; private set; }
 
         public event DeviceInfoChangeHandler DeviceInfoChanged;
     }
