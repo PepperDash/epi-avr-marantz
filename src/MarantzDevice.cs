@@ -1,6 +1,7 @@
 ﻿using Crestron.SimplSharp;
 using Crestron.SimplSharpPro.CrestronThread;
 using Crestron.SimplSharpPro.DeviceSupport;
+using Crestron.SimplSharpPro.GeneralIO;
 using PepperDash.Core;
 using PepperDash.Essentials.AppServer.Messengers;
 using PepperDash.Essentials.Core;
@@ -40,6 +41,8 @@ namespace PDT.Plugins.Marantz
         private readonly GenericCommunicationMonitor _commsMonitor;
         private readonly Dictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
 
+        private MarantzZone2 _zone2;
+
         public ISelectableItems<eSurroundModes> SurroundSoundModes { get; private set; }
 
         public ISelectableItems<string> Inputs { get; private set; }
@@ -55,7 +58,7 @@ namespace PDT.Plugins.Marantz
         public bool PowerIsOn
         {
             get { return _powerIsOn; }
-            set
+            private set
             {
                 if (value == _powerIsOn)
                     return;
@@ -96,7 +99,7 @@ namespace PDT.Plugins.Marantz
         public bool MuteIsOn
         {
             get { return _muteIsOn; }
-            set
+            private set
             {
                 if (value == _muteIsOn)
                     return;
@@ -113,7 +116,7 @@ namespace PDT.Plugins.Marantz
         public int VolumeLevel
         {
             get { return _volumeLevel; }
-            set
+            private set
             {
                 if (value == _volumeLevel)
                     return;
@@ -203,6 +206,12 @@ namespace PDT.Plugins.Marantz
                 SetupPolling();
 
                 SetupConsoleCommands();
+
+                if(config.EnableZone2)
+                {
+                    _zone2 = new MarantzZone2(Key + "-z2", Name + " - Zone 2", this);
+                    DeviceManager.AddDevice(_zone2);
+                }
             }
             catch (Exception e)
             {
@@ -295,26 +304,6 @@ namespace PDT.Plugins.Marantz
                     {"BT", new MarantzInput("BT", "BT", this, "BT")},
                 }
             };
-        }
-
-        private void SetupSurroundChannels()
-        {
-            //_surroundChannels.Add(SurroundChannel.FrontLeft, new MarantzChannelVolume("FL", this));
-            //_surroundChannels.Add(SurroundChannel.FrontRight, new MarantzChannelVolume("FR", this));
-            //_surroundChannels.Add(SurroundChannel.Center, new MarantzChannelVolume("C", this));
-            //_surroundChannels.Add(SurroundChannel.SurroundLeft, new MarantzChannelVolume("SL", this));
-            //_surroundChannels.Add(SurroundChannel.SurroundRight, new MarantzChannelVolume("SR", this));
-            //_surroundChannels.Add(SurroundChannel.SurroundBackLeft, new MarantzChannelVolume("SBL", this));
-            //_surroundChannels.Add(SurroundChannel.SurroundBackRight, new MarantzChannelVolume("SBR", this));
-            //_surroundChannels.Add(SurroundChannel.Subwoofer, new MarantzChannelVolume("SW", this));
-            //_surroundChannels.Add(SurroundChannel.Subwoofer2, new MarantzChannelVolume("SW2", this));
-            //_surroundChannels.Add(SurroundChannel.FrontDolbyLeft, new MarantzChannelVolume("FDL", this));
-            //_surroundChannels.Add(SurroundChannel.FrontDolbyRight, new MarantzChannelVolume("FDR", this));
-            //_surroundChannels.Add(SurroundChannel.SurroundDolbyLeft, new MarantzChannelVolume("SDL", this));
-            //_surroundChannels.Add(SurroundChannel.SurroundDolbyRight, new MarantzChannelVolume("SDR", this));
-            //_surroundChannels.Add(SurroundChannel.BackDolbyLeft, new MarantzChannelVolume("BDL", this));
-            //_surroundChannels.Add(SurroundChannel.BackDolbyRight, new MarantzChannelVolume("BDR", this));
-            //_surroundChannels.Add(SurroundChannel.CenterHeight, new MarantzChannelVolume("CH", this));
         }
 
         public void SetDefaultChannelLevels()
@@ -560,7 +549,7 @@ namespace PDT.Plugins.Marantz
                 catch (Exception ex)
                 {
                     Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing max volume response: {0}{1}",
-                                               rx, ex);
+                    rx, ex);
                 }
             }
             else if (rx.StartsWith("MV"))
@@ -656,23 +645,22 @@ namespace PDT.Plugins.Marantz
                     //Debug.Console(2, this, "matchString: {0}", matchString);
 
                     var mode = SurroundSoundModes.Items.FirstOrDefault
-                        (x => matchString.StartsWith(((x.Value) as MarantzSurroundMode).MatchString)).Value;
+                        (x => matchString.StartsWith(((x.Value) as MarantzSurroundMode).MatchString));
 
-                    // TODO: This is matching PURE DIRECT as DIRECT
 
-                    if (mode != null && SurroundSoundModes.Items.ContainsValue(mode))
+                    if (mode.Value != null)
                     {
                         // must set this first, as the mode select will fire an event
-                        SurroundSoundModes.CurrentItem = surroundMode;
+                        SurroundSoundModes.CurrentItem = mode.Key;
 
                         foreach (var item in SurroundSoundModes.Items)
                         {
-                            var isSelected = item.Value.Equals(mode);
+                            var isSelected = item.Key.Equals(mode.Key);
                             item.Value.IsSelected = isSelected;
                         }
-;                    } else
+;                   } else
                     {
-                        SurroundSoundModes.CurrentItem = "Unknown";
+                        SurroundSoundModes.CurrentItem = eSurroundModes.Unknown;
                         SurroundSoundModes.Items.All(x => x.Value.IsSelected = false);
                         Debug.Console(2, this, "Unknown Surround Mode: {0}", surroundMode);
                     }
@@ -683,6 +671,12 @@ namespace PDT.Plugins.Marantz
                     Debug.Console(2, Debug.ErrorLogLevel.Notice,
                         "Caught an exception parsing surround mode response: {0}{1}", rx, ex);
                 }
+            }
+            else if (rx.StartsWith("Z2"))
+            {
+                if (_zone2 == null) return;
+
+                _zone2.ParseRx(rx);
             }
             else
             {
@@ -847,7 +841,7 @@ namespace PDT.Plugins.Marantz
                 while (device._rampVolumeUp && level < 980)
                 {
                     var newLevel = level + 5;
-                    var request = MarantzUtils.VolumeCommand(newLevel);
+                    var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
                     wh.Wait(50);
                 }
@@ -884,7 +878,7 @@ namespace PDT.Plugins.Marantz
                 while (device._rampVolumeDown && level > 0)
                 {
                     var newLevel = level - 5;
-                    var request = MarantzUtils.VolumeCommand(newLevel);
+                    var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
                     wh.Wait(50);
                 }
@@ -916,7 +910,7 @@ namespace PDT.Plugins.Marantz
         public void SetVolume(ushort level)
         {
             var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, 65535, 0, 980, 0);
-            var request = MarantzUtils.VolumeCommand((int) desiredLevel);
+            var request = MarantzUtils.VolumeCommand((int) desiredLevel, "MV");
             SendText(request);
         }
 

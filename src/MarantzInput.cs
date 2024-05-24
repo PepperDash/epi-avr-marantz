@@ -1,8 +1,6 @@
 
 using System;
 using System.Collections.Generic;
-using PepperDash.Essentials.Core.DeviceTypeInterfaces;
-
 
 #if SERIES4
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
@@ -65,6 +63,47 @@ namespace PDT.Plugins.Marantz
         private readonly MarantzDevice _parent;
 
         public MarantzInput(string key, string name, MarantzDevice parent, string inputCommand)
+        {
+            Key = key;
+            Name = name;
+            _parent = parent;
+            _inputCommand = inputCommand;
+        }
+
+        public string Key { get; private set; }
+        public string Name { get; private set; }
+
+        public event EventHandler ItemUpdated;
+
+        public bool IsSelected
+        {
+            get { return _isSelected; }
+            set
+            {
+                if (value == _isSelected)
+                    return;
+
+                _isSelected = value;
+                var handler = ItemUpdated;
+                if (handler != null)
+                    handler(this, EventArgs.Empty);
+            }
+        }
+
+        public void Select()
+        {
+            _parent.SetInput(_inputCommand);
+        }
+    }
+
+    public class MarantzZone2Input : ISelectableItem
+    {
+        private bool _isSelected;
+
+        private readonly string _inputCommand;
+        private readonly MarantzZone2 _parent;
+
+        public MarantzZone2Input(string key, string name, MarantzZone2 parent, string inputCommand)
         {
             Key = key;
             Name = name;

@@ -29,9 +29,9 @@ namespace PDT.Plugins.Marantz
             }
         }
 
-        private string _currentItem;
+        private eSurroundModes _currentItem;
 
-        public string CurrentItem
+        public eSurroundModes CurrentItem
         {
             get
             {

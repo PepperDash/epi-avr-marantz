@@ -9,7 +9,7 @@ namespace PDT.Plugins.Marantz
 {
     public static class MarantzUtils
     {
-        public static string VolumeCommand(int requestedLevel)
+        public static string VolumeCommand(int requestedLevel, string prefix)
         {
             if (requestedLevel > 980 || requestedLevel < 0)
                 throw new ArgumentOutOfRangeException("requested level", "the max level allowed is 980 the min level is 0");
@@ -29,7 +29,7 @@ namespace PDT.Plugins.Marantz
                 else if (requestedLevel % 10 == 5) levelToSend = level.ToString("D").PadLeft(3, '0');
             }
 
-            return "MV" + levelToSend;
+            return prefix + levelToSend;
         }
 
         public static string ChannelVolumeCommand(string channelName, int requestedLevel)
