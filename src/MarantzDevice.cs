@@ -573,7 +573,7 @@ namespace PDT.Plugins.Marantz
                         rx, ex);
                 }
             }
-            else if (rx.StartsWith("CV"))
+            else if (rx.StartsWith("CV") && !rx.Contains("END"))
             {
                 // CVFL 50<CR>
                 // TODO: Need to deal with 3 digit values that indicate half decibels
@@ -604,8 +604,12 @@ namespace PDT.Plugins.Marantz
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(2, Debug.ErrorLogLevel.Notice,
-                        "Caught an exception parsing channel volume response: {0}{1}", rx, ex);
+#if SERIES4
+                    Debug.LogMessage(ex, "Caught an exception parsing channel volume response: {response}", this, rx);
+#else
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing volume response: {0}{1}",
+                        rx, ex);
+#endif
                 }
             }
             else if (rx.StartsWith("SI"))
