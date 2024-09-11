@@ -688,10 +688,10 @@ namespace PDT.Plugins.Marantz
                 switch (rx)
                 {
                         //POWER RESPONSES
-                    case "PWON":
+                    case "ZMON": // alternate: PWON (affects the AVR device, all zones)
                         PowerIsOn = true;
                         break;
-                    case "PWSTANDBY":
+                    case "ZMOFF": // alternate: PWSTANDBY (affects the AVR device, all zones)
                         PowerIsOn = false;
                         break;
 
@@ -717,7 +717,7 @@ namespace PDT.Plugins.Marantz
         private static void Poll(object state)
         {
             var device = (MarantzDevice) state;
-            device.SendText("PW?");
+            device.SendText("ZM?"); // alternate: PW? (query for AVR overall device power)
 
             if (!device.PowerIsOn) return;
 
@@ -776,7 +776,7 @@ namespace PDT.Plugins.Marantz
 
         public void PowerOn()
         {
-            SendText("PWON");
+            SendText("ZMON"); // alternate: PWON
 
             _isWarmingUp = true;
             IsWarmingUpFeedback.FireUpdate();
@@ -790,7 +790,7 @@ namespace PDT.Plugins.Marantz
 
         public void PowerOff()
         {
-            SendText("PWSTANDBY");
+            SendText("ZMOFF"); // alternate: PWSTANDBY
 
             _isCoolingDown = true;
             IsCoolingDownFeedback.FireUpdate();
