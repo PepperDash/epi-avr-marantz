@@ -521,6 +521,7 @@ namespace PDT.Plugins.Marantz
 
         public override void Initialize()
         {
+            _comms.Connect();
             _commsMonitor.Start();
         }
 
