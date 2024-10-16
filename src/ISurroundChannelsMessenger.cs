@@ -101,9 +101,9 @@ namespace PDT.Plugins.Marantz
 
                 AddAction($"/{key}/muteOff", (id, content) => control.MuteOff());
 
-                AddAction($"/{key}/volumeUp", (id, content) => PressAndHoldHandler.HandlePressAndHold(content, (b) => control.VolumeUp(b)));
+                AddAction($"/{key}/volumeUp", (id, content) => PressAndHoldHandler.HandlePressAndHold(key, content, (b) => control.VolumeUp(b)));
 
-                AddAction($"/{key}/volumeDown", (id, content) => PressAndHoldHandler.HandlePressAndHold(content, (b) => control.VolumeDown(b)));
+                AddAction($"/{key}/volumeDown", (id, content) => PressAndHoldHandler.HandlePressAndHold(key, content, (b) => control.VolumeDown(b)));
 
                 control.VolumeLevelFeedback.OutputChange += (o, a) => PostStatusMessage(JToken.FromObject(new
                 {

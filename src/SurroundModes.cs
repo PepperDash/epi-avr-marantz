@@ -10,6 +10,7 @@ namespace PDT.Plugins.Marantz
 {
     public enum eSurroundModes
     {
+        Unknown,
         Direct,
         PureDirect,
         Stereo,

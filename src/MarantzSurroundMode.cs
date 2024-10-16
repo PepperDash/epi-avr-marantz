@@ -29,9 +29,9 @@ namespace PDT.Plugins.Marantz
             }
         }
 
-        private string _currentItem;
+        private eSurroundModes _currentItem;
 
-        public string CurrentItem
+        public eSurroundModes CurrentItem
         {
             get
             {
@@ -47,6 +47,8 @@ namespace PDT.Plugins.Marantz
                 CurrentItemChanged?.Invoke(this, null);
             }
         }
+
+        
 
         public event EventHandler ItemsUpdated;
         public event EventHandler CurrentItemChanged;

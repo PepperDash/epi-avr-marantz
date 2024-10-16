@@ -660,10 +660,10 @@ namespace PDT.Plugins.Marantz
 
                     // TODO: This is matching PURE DIRECT as DIRECT
 
-                    if (mode != null && SurroundSoundModes.Items.ContainsValue(mode))
+                    if (mode != null && SurroundSoundModes.Items.ContainsValue(mode) && Enum.TryParse<eSurroundModes>(surroundMode, true, out var parsedSurroundMode))
                     {
                         // must set this first, as the mode select will fire an event
-                        SurroundSoundModes.CurrentItem = surroundMode;
+                        SurroundSoundModes.CurrentItem = parsedSurroundMode;
 
                         foreach (var item in SurroundSoundModes.Items)
                         {
@@ -672,7 +672,7 @@ namespace PDT.Plugins.Marantz
                         }
 ;                    } else
                     {
-                        SurroundSoundModes.CurrentItem = "Unknown";
+                        SurroundSoundModes.CurrentItem = eSurroundModes.Unknown;
                         SurroundSoundModes.Items.All(x => x.Value.IsSelected = false);
                         Debug.Console(2, this, "Unknown Surround Mode: {0}", surroundMode);
                     }
