@@ -31,7 +31,7 @@ namespace PDT.Plugins.Marantz
         ICommunicationMonitor,
         IHasFeedback,
         IHasSurroundChannels,
-        IHasInputs<string, string>,
+        IHasInputs<string>,
         IRoutingSinkWithSwitching,
         IDeviceInfoProvider,
         IHasSurroundSoundModes<eSurroundModes, string>,
