@@ -13,7 +13,7 @@ namespace PDT.Plugins.Marantz
     public class MarantzZone2 : EssentialsDevice,
         IHasPowerControlWithFeedback,
         IBasicVolumeWithFeedbackAdvanced,
-        IHasInputs<string, string>,
+        IHasInputs<string>,
         IWarmingCooling
     {
         private MarantzDevice _parent;

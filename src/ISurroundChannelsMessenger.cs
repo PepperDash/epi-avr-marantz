@@ -15,9 +15,7 @@ namespace PDT.Plugins.Marantz
 {
     public class ISurroundChannelsMessenger : MessengerBase
     {
-        private readonly IHasSurroundChannels _surroundDevice;
-
-        private CTimer _updateTimer;
+        private readonly IHasSurroundChannels _surroundDevice;        
 
         public ISurroundChannelsMessenger(string key, string messagePath, IHasSurroundChannels device) : base(key, messagePath, device)
         {
@@ -101,9 +99,9 @@ namespace PDT.Plugins.Marantz
 
                 AddAction($"/{key}/muteOff", (id, content) => control.MuteOff());
 
-                AddAction($"/{key}/volumeUp", (id, content) => PressAndHoldHandler.HandlePressAndHold(content, (b) => control.VolumeUp(b)));
+                AddAction($"/{key}/volumeUp", (id, content) => PressAndHoldHandler.HandlePressAndHold(_surroundDevice.Key, content, (b) => control.VolumeUp(b)));
 
-                AddAction($"/{key}/volumeDown", (id, content) => PressAndHoldHandler.HandlePressAndHold(content, (b) => control.VolumeDown(b)));
+                AddAction($"/{key}/volumeDown", (id, content) => PressAndHoldHandler.HandlePressAndHold(_surroundDevice.Key, content, (b) => control.VolumeDown(b)));
 
                 control.VolumeLevelFeedback.OutputChange += (o, a) => PostStatusMessage(JToken.FromObject(new
                 {
