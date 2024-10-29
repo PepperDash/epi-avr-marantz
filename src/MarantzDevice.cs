@@ -207,7 +207,7 @@ namespace PDT.Plugins.Marantz
 
                 SetupConsoleCommands();
 
-                if(config.EnableZone2)
+                if (config.EnableZone2)
                 {
                     _zone2 = new MarantzZone2(Key + "-z2", Name + " - Zone 2", this);
                     DeviceManager.AddDevice(_zone2);
@@ -398,7 +398,7 @@ namespace PDT.Plugins.Marantz
                 new RoutingInputPort("AUX1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX1",
                     this),
                 new RoutingInputPort("AUX2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX2",
-                    this),  
+                    this),
                 new RoutingInputPort("AUX3", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX3",
                     this),
                 new RoutingInputPort("AUX4", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX4",
@@ -539,7 +539,7 @@ namespace PDT.Plugins.Marantz
         }
 
         private void ParseResponse(string rx)
-        { 
+        {
             if (rx.StartsWith("MVMAX"))
             {
                 try
@@ -558,14 +558,14 @@ namespace PDT.Plugins.Marantz
                 // MV80<CR>
                 // TODO: Need to deal with 3 digit values that indicate half decibels
                 try
-                { 
+                {
                     var volumeString = rx.Substring(2).Trim();
                     var level = int.Parse(volumeString);
 
                     // Multiply 2 digit values by 10
                     if (volumeString.Length <= 2) VolumeLevel = level * 10;
                     else VolumeLevel = level;
-                        
+
                 }
                 catch (Exception ex)
                 {
@@ -580,7 +580,7 @@ namespace PDT.Plugins.Marantz
                 try
                 {
                     var volumeString = rx.Substring(2).Trim();
-                    var parts = volumeString.Split(new[] {' '});
+                    var parts = volumeString.Split(new[] { ' ' });
                     var channelName = parts[0];
                     var response = parts[1];
 
@@ -663,7 +663,9 @@ namespace PDT.Plugins.Marantz
                             var isSelected = item.Key.Equals(mode.Key);
                             item.Value.IsSelected = isSelected;
                         }
-;                   } else
+;
+                    }
+                    else
                     {
                         SurroundSoundModes.CurrentItem = eSurroundModes.Unknown;
                         SurroundSoundModes.Items.All(x => x.Value.IsSelected = false);
@@ -687,7 +689,7 @@ namespace PDT.Plugins.Marantz
             {
                 switch (rx)
                 {
-                        //POWER RESPONSES
+                    //POWER RESPONSES
                     case "ZMON": // alternate: PWON (affects the AVR device, all zones)
                         PowerIsOn = true;
                         break;
@@ -695,7 +697,7 @@ namespace PDT.Plugins.Marantz
                         PowerIsOn = false;
                         break;
 
-                        //MUTE RESPONSES
+                    //MUTE RESPONSES
                     case "MUON":
                         MuteIsOn = true;
                         break;
@@ -716,7 +718,7 @@ namespace PDT.Plugins.Marantz
 
         private static void Poll(object state)
         {
-            var device = (MarantzDevice) state;
+            var device = (MarantzDevice)state;
             device.SendText("ZM?"); // alternate: PW? (query for AVR overall device power)
 
             if (!device.PowerIsOn) return;
@@ -836,19 +838,19 @@ namespace PDT.Plugins.Marantz
         {
             Debug.LogMessage(Serilog.Events.LogEventLevel.Debug, "ramping volume up...");
 
-            var device = (MarantzDevice) state;
+            var device = (MarantzDevice)state;
 
             Debug.LogMessage(Serilog.Events.LogEventLevel.Debug, "Volume Level: {0}", device.VolumeLevel);
 
             using (var wh = new CEvent(true, false))
             {
-                var level = device.VolumeLevel;
-                while (device._rampVolumeUp && level < 980)
+                var newLevel = device.VolumeLevel;
+                while (device._rampVolumeUp && newLevel < 980)
                 {
-                    var newLevel = level + 5;
+                    newLevel += 5;
                     var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
-                    wh.Wait(50);
+                    wh.Wait(100);
                 }
             }
         }
@@ -873,19 +875,19 @@ namespace PDT.Plugins.Marantz
         {
             Debug.Console(2, "ramping volume down...");
 
-            var device = (MarantzDevice) state;
+            var device = (MarantzDevice)state;
 
             Debug.Console(2, "Volume Level: {0}", device.VolumeLevel);
 
             using (var wh = new CEvent(true, false))
             {
-                var level = device.VolumeLevel;
-                while (device._rampVolumeDown && level > 0)
+                var newLevel = device.VolumeLevel;
+                while (device._rampVolumeDown && newLevel > 0)
                 {
-                    var newLevel = level - 5;
+                    newLevel -= 5;
                     var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
-                    wh.Wait(50);
+                    wh.Wait(100);
                 }
             }
         }
@@ -915,7 +917,7 @@ namespace PDT.Plugins.Marantz
         public void SetVolume(ushort level)
         {
             var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, 65535, 0, 980, 0);
-            var request = MarantzUtils.VolumeCommand((int) desiredLevel, "MV");
+            var request = MarantzUtils.VolumeCommand((int)desiredLevel, "MV");
             SendText(request);
         }
 
@@ -947,7 +949,7 @@ namespace PDT.Plugins.Marantz
         {
             try
             {
-                var inputToSend = (string) inputSelector;
+                var inputToSend = (string)inputSelector;
                 var zone = outputSelector as string ?? string.Empty;
 
                 switch (zone)
@@ -972,12 +974,14 @@ namespace PDT.Plugins.Marantz
         public Dictionary<SurroundChannel, IBasicVolumeWithFeedback> SurroundChannels
         {
             get
-            {           
+            {
                 return _surroundChannels.ToDictionary(pair => pair.Key, pair => pair.Value as IBasicVolumeWithFeedback);
             }
         }
 
-        public string CurrentSourceInfoKey { get
+        public string CurrentSourceInfoKey
+        {
+            get
             {
                 return _currentSourceListKey;
             }
