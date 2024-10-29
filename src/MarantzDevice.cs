@@ -979,11 +979,11 @@ namespace PDT.Plugins.Marantz
 
         public string CurrentSourceInfoKey { get
             {
-                return CurrentSourceInfo.SourceListKey;
+                return _currentSourceListKey;
             }
             set
             {
-                // TODO: Get rid of this setter once the interface definition is updated to remove the setter requirement.
+                _currentSourceListKey = value;
             }
         }
 
@@ -1008,6 +1008,8 @@ namespace PDT.Plugins.Marantz
                     handler(_currentSourceItem, ChangeType.DidChange);
             }
         }
+
+        private string _currentSourceListKey;
 
         private SourceListItem _currentSourceItem;
 
