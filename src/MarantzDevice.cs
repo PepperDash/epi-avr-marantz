@@ -1,44 +1,96 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Crestron.SimplSharp;
+﻿using Crestron.SimplSharp;
+using Crestron.SimplSharpPro.CrestronThread;
 using Crestron.SimplSharpPro.DeviceSupport;
+using Crestron.SimplSharpPro.GeneralIO;
 using PepperDash.Core;
+using PepperDash.Essentials.AppServer.Messengers;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Bridges;
 using PepperDash.Essentials.Core.DeviceInfo;
+using PepperDash.Essentials.Core.DeviceTypeInterfaces;
+using PepperDash.Essentials.Core.Queues;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Feedback = PepperDash.Essentials.Core.Feedback;
 
+
+// TODO: Add IHasInputs and IInputs back into this repo for 3-series compatibility
+
+#if SERIES4
+#else
+using PDT.Plugins.Marantz.Interfaces;
+#endif
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzDevice : EssentialsBridgeableDevice, 
-        IOnline, 
+    public class MarantzDevice : EssentialsBridgeableDevice,
+        IOnline,
         IHasPowerControlWithFeedback,
-        IBasicVolumeWithFeedback, 
-        IRouting, 
-        ICommunicationMonitor, 
+        IBasicVolumeWithFeedbackAdvanced,
+        IRouting,
+        ICommunicationMonitor,
         IHasFeedback,
         IHasSurroundChannels,
-        IHasInputs,
+        IHasInputs<string>,
         IRoutingSinkWithSwitching,
-        IDeviceInfoProvider
+        IDeviceInfoProvider,
+        IHasSurroundSoundModes<eSurroundModes, string>,
+        IWarmingCooling
     {
         private readonly IBasicCommunication _comms;
         private readonly GenericCommunicationMonitor _commsMonitor;
-        private readonly IDictionary<string, MarantzInput> _inputs;
-        private readonly IDictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
+        private readonly Dictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
+
+        private MarantzZone2 _zone2;
+
+        public ISelectableItems<eSurroundModes> SurroundSoundModes { get; private set; }
+
+        public ISelectableItems<string> Inputs { get; private set; }
+
+
+        private readonly GenericQueue _receiveQueue;
 
         private const string CommsDelimiter = "\r";
 
         private bool _powerIsOn;
 
+
         public bool PowerIsOn
         {
             get { return _powerIsOn; }
-            set
+            private set
             {
+                if (value == _powerIsOn)
+                    return;
                 _powerIsOn = value;
                 PowerIsOnFeedback.FireUpdate();
+                if (_powerIsOn)
+                {
+                    _isWarmingUp = false;
+                    IsWarmingUpFeedback.FireUpdate();
+                }
+                else
+                {
+                    _isCoolingDown = false;
+                    IsCoolingDownFeedback.FireUpdate();
+                    VolumeLevel = 0;
+
+                    // Clear out any FB that is invalid when the unit is off
+                    CurrentSourceInfoKey = null;
+                    CurrentSourceInfo = null;
+
+                    MuteIsOn = false;
+
+                    foreach (var item in Inputs.Items)
+                    {
+                        item.Value.IsSelected = false;
+                    }
+
+                    foreach (var item in SurroundSoundModes.Items)
+                    {
+                        item.Value.IsSelected = false;
+                    }
+                }
             }
         }
 
@@ -47,8 +99,10 @@ namespace PDT.Plugins.Marantz
         public bool MuteIsOn
         {
             get { return _muteIsOn; }
-            set
+            private set
             {
+                if (value == _muteIsOn)
+                    return;
                 _muteIsOn = value;
                 MuteFeedback.FireUpdate();
             }
@@ -56,92 +110,262 @@ namespace PDT.Plugins.Marantz
 
         private int _volumeLevel;
 
+        /// <summary>
+        /// Volume level from 0 - 980
+        /// </summary>
         public int VolumeLevel
         {
             get { return _volumeLevel; }
-            set
+            private set
             {
+                if (value == _volumeLevel)
+                    return;
                 _volumeLevel = value;
+                Debug.Console(2, this, " Volume Level: {0}", _volumeLevel);
                 VolumeLevelFeedback.FireUpdate();
             }
         }
 
-        private string _currentInput;
-
-        public string CurrentInput
+        /// <summary>
+        /// The raw decimal volume of the channel from -80dB (-800) to 18dB (180) in decibels
+        /// </summary>
+        public int RawVolumeLevel
         {
-            get { return _currentInput; }
-            set
+            get
             {
-                _currentInput = value;
-                CurrentInputFeedback.FireUpdate();
+                return CrestronEnvironment.ScaleWithLimits(VolumeLevel, 980, 0, 180, -800);
             }
         }
 
-        private string _currentSurroundMode;
-
-        public string CurrentSurroundMode
+        public eVolumeLevelUnits Units
         {
-            get { return _currentSurroundMode; }
+            get { return eVolumeLevelUnits.Decibels; }
+        }
+
+        private int _maxVolLevel;
+        public int MaxVolLevel
+        {
+            get { return _maxVolLevel; }
             set
             {
-                _currentSurroundMode = value;
-                CurrentInputFeedback.FireUpdate();
+                _maxVolLevel = value;
+            }
+        }
+
+        private int _minVolLevel;
+        public int MinVolLevel
+        {
+            get { return _minVolLevel; }
+            set
+            {
+                _minVolLevel = value;
             }
         }
 
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
         {
-            DeviceInfo = new DeviceInfo();
-
-            _surroundChannels = new Dictionary<SurroundChannel, MarantzChannelVolume>();
-
-            _comms = comms;
-
-            var socket = _comms as ISocketStatus;
-            if (socket != null)
+            try
             {
-                socket.ConnectionChange += OnSocketConnectionChange;
+                _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
+
+                DeviceInfo = new DeviceInfo();
+
+                _surroundChannels = new Dictionary<SurroundChannel, MarantzChannelVolume>();
+
+                _comms = comms;
+
+                var socket = _comms as ISocketStatus;
+                if (socket != null)
+                {
+                    socket.ConnectionChange += OnSocketConnectionChange;
+                }
+
+                var monitorConfig = config.Monitor ?? new CommunicationMonitorConfig()
+                {
+                    PollString = "PW?" + CommsDelimiter,
+                    PollInterval = 30000,
+                    TimeToWarning = 60000,
+                    TimeToError = 120000
+                };
+
+                _commsMonitor = new GenericCommunicationMonitor(this, comms, monitorConfig);
+
+                SetupInputs();
+
+                SetupDefaultSurroundModes();
+
+                //SetupSurroundChannels();
+
+                SetupGather();
+
+                SetupRoutingPorts();
+
+                SetupFeedbacks();
+
+                SetupPolling();
+
+                SetupConsoleCommands();
+
+                if (config.EnableZone2)
+                {
+                    _zone2 = new MarantzZone2(Key + "-z2", Name + " - Zone 2", this);
+                    DeviceManager.AddDevice(_zone2);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.Console(0, this, "Error in the constructor: {0}", e);
+            }
+        }
+
+        public override bool CustomActivate()
+        {
+            // Check for mobile control and add the custom messengers 
+            var mc = DeviceManager.AllDevices.OfType<IMobileControl>().FirstOrDefault();
+
+            if (mc == null)
+            {
+                return base.CustomActivate();
             }
 
-            var monitorConfig = config.Monitor ?? new CommunicationMonitorConfig()
+            var surroundModeMessenger = new ISelectableItemsMessenger<eSurroundModes>
+                (string.Format("{0}-surroundSoundModes-plugin", Key),
+                string.Format("/device/{0}", Key),
+                this.SurroundSoundModes, "surroundSoundModes");
+            mc.AddDeviceMessenger(surroundModeMessenger);
+
+            var surroundChannelMessenger = new ISurroundChannelsMessenger
+                (string.Format("{0}-surroundChannels-plugin", Key),
+                               string.Format("/device/{0}", Key),
+                                              this);
+            mc.AddDeviceMessenger(surroundChannelMessenger);
+
+            // Inputs messenger should be automatically added by the MC plugin
+
+            return base.CustomActivate();
+        }
+
+        /// <summary>
+        /// Attempts to add a messenger for the surround channel
+        /// </summary>
+        /// <param name="channel"></param>
+        private void AddSurroundChannelMessenger(SurroundChannel channel)
+        {
+            try
             {
-                PollString = "PW?" + CommsDelimiter,
-                PollInterval = 30000,
-                TimeToWarning = 60000,
-                TimeToError = 120000
+                var mc = DeviceManager.AllDevices.OfType<IMobileControl>().FirstOrDefault();
+
+                if (mc == null)
+                {
+                    return;
+                }
+
+                if (_surroundChannels.TryGetValue(channel, out var channelValue))
+                {
+                    var channelMessenger = new DeviceVolumeMessenger(
+                        string.Format("{0}-{1}-channelVolume-plugin", Key, channel.ToString()),
+                        string.Format("/device/{0}/{1}", Key, channel.ToString()),
+                        channelValue);
+                    mc.AddDeviceMessenger(channelMessenger);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.Console(0, this, "Error adding channel volume messengers: {0}", e);
+            }
+        }
+
+        private void SetupInputs()
+        {
+            Inputs = new MarantzInputs
+            {
+                Items = new Dictionary<string, ISelectableItem>
+                {
+                    {"DVD", new MarantzInput("DVD", "DVD", this, "DVD")},
+                    {"BD", new MarantzInput("BD", "BD", this, "BD")},
+                    {"TV", new MarantzInput("TV", "TV", this, "TV")},
+                    {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
+                    {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
+                    {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
+                    {"8K", new MarantzInput("8K", "8K", this, "8K")},
+                    {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
+                    {"AUX2", new MarantzInput("AUX2", "AUX2", this, "AUX2")},
+                    //{"AUX3", new MarantzInput("AUX3", "AUX3", this, "AUX3")},
+                    //{"AUX4", new MarantzInput("AUX4", "AUX4", this, "AUX4")},
+                    //{"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
+                    //{"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
+                    //{"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
+                    {"CD", new MarantzInput("CD", "CD", this, "CD")},
+                    //{"PHONO", new MarantzInput("PHONO", "PHONO", this, "PHONO")},
+                    //{"TUNER", new MarantzInput("TUNER", "TUNER", this, "TUNER")},
+                    //{"HDRADIO", new MarantzInput("HDRADIO", "HDRADIO", this, "HDRADIO")},
+                    {"NET", new MarantzInput("NET", "NET", this, "NET")},
+                    {"BT", new MarantzInput("BT", "BT", this, "BT")},
+                }
+            };
+        }
+
+        public void SetDefaultChannelLevels()
+        {
+            SendText("CVZRL");
+
+            // OR on older models
+            //foreach (var channel in _surroundChannels)
+            //{
+            //    channel.Value.SetVolume(500);
+            //}
+        }
+
+        private void SetupDefaultSurroundModes()
+        {
+            // Denon AVR-2311CI Surround Modes
+            SurroundSoundModes = new MarantzSurroundModes
+            {
+
+                Items = new Dictionary<eSurroundModes, ISelectableItem>
+                {
+                    {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
+                    {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
+                    {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
+                    //{eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
+                    {eSurroundModes.Matrix, new MarantzSurroundMode(eSurroundModes.Matrix.ToString(), "Matrix", this, "MATRIX")},
+                    //{eSurroundModes.MonoMovie, new MarantzSurroundMode(eSurroundModes.MonoMovie.ToString(), "Mono Movie", this, "MONO MOVIE")},
+                    {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
+                    {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
+                    //{eSurroundModes.RockArena, new MarantzSurroundMode(eSurroundModes.RockArena.ToString(), "Rock Arena", this, "ROCK ARENA")},
+                    {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
+                    {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
+                    {eSurroundModes.VideoGame, new MarantzSurroundMode(eSurroundModes.VideoGame.ToString(), "Video Game", this, "VIDEO GAME")},
+                    {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
+                }
             };
 
-            _commsMonitor = new GenericCommunicationMonitor(this, comms, monitorConfig);
+            // Marants SR8015 Surround Modes
+            //SurroundSoundModes = new MarantzSurroundModes
+            //{
 
-            _inputs = new Dictionary<string, MarantzInput>
-            {
-                {"DVD", new MarantzInput("DVD", "DVD", this, "DVD")},
-                {"BD", new MarantzInput("BD", "BD", this, "BD")},
-                {"TV", new MarantzInput("TV", "TV", this, "TV")},
-                {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
-                {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
-                {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
-                {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
-                {"AUX2", new MarantzInput("AUX2", "AUX2", this, "AUX2")},
-                {"AUX3", new MarantzInput("AUX3", "AUX3", this, "AUX3")},
-                {"AUX4", new MarantzInput("AUX4", "AUX4", this, "AUX4")},
-                {"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
-                {"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
-                {"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
-                {"CD", new MarantzInput("CD", "CD", this, "CD")},
-            };
-
-            SetupGather();
-
-            SetupRoutingPorts();
-
-            SetupFeedbacks();
-
-            SetupPolling();
-
-            SetupConsoleCommands();
+            //    Items = new Dictionary<eSurroundModes, ISelectableItem>
+            //    {
+            //        {eSurroundModes.Auro2DSurround, new MarantzSurroundMode(eSurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR")},
+            //        {eSurroundModes.Auro3D, new MarantzSurroundMode(eSurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D")},
+            //        {eSurroundModes.Auto, new MarantzSurroundMode(eSurroundModes.Auto.ToString(), "Auto", this, "AUTO")},
+            //        {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
+            //        {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
+            //        {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
+            //        {eSurroundModes.Game, new MarantzSurroundMode(eSurroundModes.Game.ToString(), "Game", this, "GAME")},
+            //        {eSurroundModes.Left, new MarantzSurroundMode(eSurroundModes.Left.ToString(), "Left", this, "LEFT")},
+            //        {eSurroundModes.Movie, new MarantzSurroundMode(eSurroundModes.Movie.ToString(), "Movie", this, "MOVIE")},
+            //        {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
+            //        {eSurroundModes.Music, new MarantzSurroundMode(eSurroundModes.Music.ToString(), "Music", this, "MUSIC")},
+            //        {eSurroundModes.Neural, new MarantzSurroundMode(eSurroundModes.Neural.ToString(), "Neural", this, "NEURAL")},
+            //        {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
+            //        {eSurroundModes.Right, new MarantzSurroundMode(eSurroundModes.Right.ToString(), "Right", this, "RIGHT")}
+            //        {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
+            //        {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
+            //        {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")},
+            //    }
+            //};
         }
 
         private void SetupGather()
@@ -164,6 +388,7 @@ namespace PDT.Plugins.Marantz
                     this),
                 new RoutingInputPort("GAME", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME",
                     this),
+                new RoutingInputPort("8K", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "8K", this),
                 new RoutingInputPort("TUNER", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TUNER",
                     this),
                 new RoutingInputPort("HDRADIO", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi,
@@ -191,7 +416,7 @@ namespace PDT.Plugins.Marantz
 
             OutputPorts = new RoutingPortCollection<RoutingOutputPort>
             {
-                new RoutingOutputPort("ZONE1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "", this),
+                new RoutingOutputPort("ZONE1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "Main", this),
                 new RoutingOutputPort("ZONE2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "Z2", this)
             };
         }
@@ -213,7 +438,7 @@ namespace PDT.Plugins.Marantz
                         PowerOff();
                         break;
                     case "input?":
-                        CrestronConsole.ConsoleCommandResponse("{0}", CurrentInput);
+                        CrestronConsole.ConsoleCommandResponse("{0}", Inputs.CurrentItem);
                         break;
                     case "power?":
                         CrestronConsole.ConsoleCommandResponse("{0}", PowerIsOn);
@@ -233,7 +458,7 @@ namespace PDT.Plugins.Marantz
             {
                 if (args.Status == MonitorStatus.IsOk)
                 {
-                    poll.Reset(25, 2000);
+                    poll.Reset(25, 10000);
                 }
                 else
                 {
@@ -244,30 +469,32 @@ namespace PDT.Plugins.Marantz
             PowerIsOnFeedback.OutputChange += (sender, args) =>
             {
                 if (args.BoolValue)
-                    poll.Reset(25, 2000);
+                    poll.Reset(25, 10000);
             };
         }
 
         private void SetupFeedbacks()
         {
-            PowerIsOnFeedback = new BoolFeedback("Power", () => PowerIsOn);
+            PowerIsOnFeedback = new BoolFeedback("PowerIsOn", () => PowerIsOn);
 
             // Main volume range = 0 - 98
             VolumeLevelFeedback = new IntFeedback("Volume", () =>
-                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 98, 0, int.MaxValue, int.MinValue));
+                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 980, 0, 65535, 0));
 
             MuteFeedback = new BoolFeedback("Mute", () => MuteIsOn);
 
-            CurrentInputFeedback = new StringFeedback("Input", () => CurrentInput);
+            IsCoolingDownFeedback = new BoolFeedback("IsCoolingDown", () => _isCoolingDown);
+            IsWarmingUpFeedback = new BoolFeedback("IsWarmingUp", () => _isWarmingUp);
 
-            CurrentSurroundModeStringFeedback = new StringFeedback("Surround Mode", () => CurrentSurroundMode);
 
             Feedbacks = new FeedbackCollection<Feedback>
             {
                 PowerIsOnFeedback,
                 MuteFeedback,
-                CurrentInputFeedback,
                 IsOnline,
+                IsCoolingDownFeedback,
+                IsWarmingUpFeedback,
+                VolumeLevelFeedback,
             };
 
             Feedbacks.Where(f => !string.IsNullOrEmpty(f.Key))
@@ -294,6 +521,7 @@ namespace PDT.Plugins.Marantz
 
         public override void Initialize()
         {
+            _comms.Connect();
             _commsMonitor.Start();
         }
 
@@ -306,27 +534,53 @@ namespace PDT.Plugins.Marantz
         {
             var rx = args.Text.Trim();
 
-            if (rx.StartsWith("MV"))
+            _receiveQueue.Enqueue(new ProcessStringMessage(rx, ParseResponse));
+
+        }
+
+        private void ParseResponse(string rx)
+        {
+            if (rx.StartsWith("MVMAX"))
             {
-                // MV80<CR>
                 try
                 {
-                    var volumeString = rx.TrimStart(new[] {'M', 'V'});
-                    VolumeLevel = int.Parse(volumeString);
+                    var maxVolString = rx.Substring(5).Trim();
+                    MaxVolLevel = int.Parse(maxVolString);
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice, "Caught an exception parsing volume response: {0}{1}",
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing max volume response: {0}{1}",
+                    rx, ex);
+                }
+            }
+            else if (rx.StartsWith("MV"))
+            {
+                // MV80<CR>
+                // TODO: Need to deal with 3 digit values that indicate half decibels
+                try
+                {
+                    var volumeString = rx.Substring(2).Trim();
+                    var level = int.Parse(volumeString);
+
+                    // Multiply 2 digit values by 10
+                    if (volumeString.Length <= 2) VolumeLevel = level * 10;
+                    else VolumeLevel = level;
+
+                }
+                catch (Exception ex)
+                {
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing volume response: {0}{1}",
                         rx, ex);
                 }
             }
-            else if (rx.StartsWith("CV"))
+            else if (rx.StartsWith("CV") && !rx.Contains("END"))
             {
                 // CVFL 50<CR>
+                // TODO: Need to deal with 3 digit values that indicate half decibels
                 try
                 {
-                    var volumeString = rx.TrimStart(new[] {'C', 'V'});
-                    var parts = volumeString.Split(new[] {' '});
+                    var volumeString = rx.Substring(2).Trim();
+                    var parts = volumeString.Split(new[] { ' ' });
                     var channelName = parts[0];
                     var response = parts[1];
 
@@ -350,8 +604,12 @@ namespace PDT.Plugins.Marantz
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice,
-                        "Caught an exception parsing channel volume response: {0}{1}", rx, ex);
+#if SERIES4
+                    Debug.LogMessage(ex, "Caught an exception parsing channel volume response: {response}", this, rx);
+#else
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing volume response: {0}{1}",
+                        rx, ex);
+#endif
                 }
             }
             else if (rx.StartsWith("SI"))
@@ -359,25 +617,22 @@ namespace PDT.Plugins.Marantz
                 // SISAT/CBL<CR>
                 try
                 {
-                    var input = rx.TrimStart(new[] {'S', 'I'});
+                    var input = rx.Substring(2).Trim();
 
-                    if (_inputs.ContainsKey(input))
+                    if (Inputs.Items.ContainsKey(input))
                     {
-                        foreach (var item in _inputs)
+
+                        foreach (var item in Inputs.Items)
                         {
                             item.Value.IsSelected = item.Key.Equals(input);
                         }
-
-                        var handler = InputsUpdated;
-                        if (handler != null)
-                            handler(this, EventArgs.Empty);
                     }
 
-                    CurrentInput = input;
+                    Inputs.CurrentItem = input;
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice, "Caught an exception parsing input response: {0}{1}",
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice, "Caught an exception parsing input response: {0}{1}",
                         rx, ex);
                 }
             }
@@ -386,28 +641,63 @@ namespace PDT.Plugins.Marantz
                 // MSDOLBY PLII MV<CR>
                 try
                 {
-                    var surroundMode = rx.TrimStart(new[] {'M', 'S'});
-                    CurrentSurroundMode = surroundMode;
+                    var surroundMode = rx.Substring(2);
+
+                    //Debug.Console(2, this, "surroundMode: {0}", surroundMode);
+
+                    var matchString = surroundMode;
+
+                    //Debug.Console(2, this, "matchString: {0}", matchString);
+
+                    var mode = SurroundSoundModes.Items.FirstOrDefault
+                        (x => matchString.StartsWith(((x.Value) as MarantzSurroundMode).MatchString));
+
+
+                    if (mode.Value != null)
+                    {
+                        // must set this first, as the mode select will fire an event
+                        SurroundSoundModes.CurrentItem = mode.Key;
+
+                        foreach (var item in SurroundSoundModes.Items)
+                        {
+                            var isSelected = item.Key.Equals(mode.Key);
+                            item.Value.IsSelected = isSelected;
+                        }
+;
+                    }
+                    else
+                    {
+                        SurroundSoundModes.CurrentItem = eSurroundModes.Unknown;
+                        SurroundSoundModes.Items.All(x => x.Value.IsSelected = false);
+                        Debug.Console(2, this, "Unknown Surround Mode: {0}", surroundMode);
+                    }
+
                 }
                 catch (Exception ex)
                 {
-                    Debug.Console(1, Debug.ErrorLogLevel.Notice,
+                    Debug.Console(2, Debug.ErrorLogLevel.Notice,
                         "Caught an exception parsing surround mode response: {0}{1}", rx, ex);
                 }
+            }
+            else if (rx.StartsWith("Z2"))
+            {
+                if (_zone2 == null) return;
+
+                _zone2.ParseRx(rx);
             }
             else
             {
                 switch (rx)
                 {
-                        //POWER RESPONSES
-                    case "PWON":
+                    //POWER RESPONSES
+                    case "ZMON": // alternate: PWON (affects the AVR device, all zones)
                         PowerIsOn = true;
                         break;
-                    case "PWSTANDBY":
+                    case "ZMOFF": // alternate: PWSTANDBY (affects the AVR device, all zones)
                         PowerIsOn = false;
                         break;
 
-                        //MUTE RESPONSES
+                    //MUTE RESPONSES
                     case "MUON":
                         MuteIsOn = true;
                         break;
@@ -428,15 +718,27 @@ namespace PDT.Plugins.Marantz
 
         private static void Poll(object state)
         {
-            var device = (MarantzDevice) state;
-            device.SendText("PW?");
+            var device = (MarantzDevice)state;
+            device.SendText("ZM?"); // alternate: PW? (query for AVR overall device power)
 
             if (!device.PowerIsOn) return;
 
-            device.SendText("MU?");
-            device.SendText("MS?");
-            device.SendText("SI?");
-            device.SendText("CV?");
+            CrestronInvoke.BeginInvoke((o) =>
+            {
+                Thread.Sleep(100);
+                device.SendText("MV?");
+                Thread.Sleep(100);
+                device.SendText("MU?");
+                Thread.Sleep(100);
+                device.SendText("MS?");
+                Thread.Sleep(100);
+                device.SendText("SI?");
+                Thread.Sleep(100);
+                device.SendText("Z2?");
+                Thread.Sleep(100);
+                device.SendText("CV?");
+
+            });
         }
 
         public override void LinkToApi(BasicTriList trilist, uint joinStart, string joinMapKey, EiscApiAdvanced bridge)
@@ -473,14 +775,33 @@ namespace PDT.Plugins.Marantz
             get { return _commsMonitor; }
         }
 
+
         public void PowerOn()
         {
-            SendText("PWON");
+            SendText("ZMON"); // alternate: PWON
+
+            _isWarmingUp = true;
+            IsWarmingUpFeedback.FireUpdate();
+
+            _warmupTimer = new CTimer(o =>
+            {
+                _isWarmingUp = false;
+                IsWarmingUpFeedback.FireUpdate();
+            }, _warmingTimeMs);
         }
 
         public void PowerOff()
         {
-            SendText("PWSTANDBY");
+            SendText("ZMOFF"); // alternate: PWSTANDBY
+
+            _isCoolingDown = true;
+            IsCoolingDownFeedback.FireUpdate();
+
+            _cooldownTimer = new CTimer(o =>
+            {
+                _isCoolingDown = false;
+                IsCoolingDownFeedback.FireUpdate();
+            }, _coolingTimeMs);
         }
 
         public void PowerToggle()
@@ -515,17 +836,21 @@ namespace PDT.Plugins.Marantz
 
         private static void RampVolumeUp(object state)
         {
-            var device = (MarantzDevice) state;
+            Debug.LogMessage(Serilog.Events.LogEventLevel.Debug, "ramping volume up...");
+
+            var device = (MarantzDevice)state;
+
+            Debug.LogMessage(Serilog.Events.LogEventLevel.Debug, "Volume Level: {0}", device.VolumeLevel);
 
             using (var wh = new CEvent(true, false))
             {
-                var level = device.VolumeLevel;
-                while (device._rampVolumeUp && level < 99)
+                var newLevel = device.VolumeLevel;
+                while (device._rampVolumeUp && newLevel < 980)
                 {
-                    var newLevel = ++level;
-                    var request = MarantzUtils.VolumeCommand(newLevel);
+                    newLevel += 5;
+                    var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
-                    wh.Wait(50);
+                    wh.Wait(100);
                 }
             }
         }
@@ -548,17 +873,21 @@ namespace PDT.Plugins.Marantz
 
         private static void RampVolumeDown(object state)
         {
-            var device = (MarantzDevice) state;
+            Debug.Console(2, "ramping volume down...");
+
+            var device = (MarantzDevice)state;
+
+            Debug.Console(2, "Volume Level: {0}", device.VolumeLevel);
 
             using (var wh = new CEvent(true, false))
             {
-                var level = device.VolumeLevel;
-                while (device._rampVolumeDown && level > 1)
+                var newLevel = device.VolumeLevel;
+                while (device._rampVolumeDown && newLevel > 0)
                 {
-                    --level;
-                    var request = MarantzUtils.VolumeCommand(level);
+                    newLevel -= 5;
+                    var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
-                    wh.Wait(50);
+                    wh.Wait(100);
                 }
             }
         }
@@ -587,8 +916,8 @@ namespace PDT.Plugins.Marantz
 
         public void SetVolume(ushort level)
         {
-            var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, uint.MaxValue, uint.MinValue, 98, 0);
-            var request = MarantzUtils.VolumeCommand((int) desiredLevel);
+            var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, 65535, 0, 980, 0);
+            var request = MarantzUtils.VolumeCommand((int)desiredLevel, "MV");
             SendText(request);
         }
 
@@ -596,17 +925,21 @@ namespace PDT.Plugins.Marantz
         {
             var inputToSend = "SI" + input.Trim().ToUpper();
             SendText(inputToSend);
+
+            SendText("SI?");
         }
 
-        public void SetSurroundMode(string surroundMode)
+        public void SetSurroundSoundMode(string surroundMode)
         {
             var surroundModeToSend = "MS" + surroundMode.Trim().ToUpper();
             SendText(surroundModeToSend);
+
+            SendText("MS?");
         }
 
         public BoolFeedback MuteFeedback { get; private set; }
         public IntFeedback VolumeLevelFeedback { get; private set; }
-        public StringFeedback CurrentInputFeedback { get; private set; }
+        //public StringFeedback CurrentInputFeedback { get; private set; }
         public StringFeedback CurrentSurroundModeStringFeedback { get; private set; }
 
         public RoutingPortCollection<RoutingInputPort> InputPorts { get; private set; }
@@ -616,7 +949,7 @@ namespace PDT.Plugins.Marantz
         {
             try
             {
-                var inputToSend = (string) inputSelector;
+                var inputToSend = (string)inputSelector;
                 var zone = outputSelector as string ?? string.Empty;
 
                 switch (zone)
@@ -638,22 +971,25 @@ namespace PDT.Plugins.Marantz
 
         public event EventHandler SurroundChannelsUpdated;
 
-        public IDictionary<SurroundChannel, IBasicVolumeWithFeedback> Channels
+        public Dictionary<SurroundChannel, IBasicVolumeWithFeedback> SurroundChannels
         {
             get
-            {           
+            {
                 return _surroundChannels.ToDictionary(pair => pair.Key, pair => pair.Value as IBasicVolumeWithFeedback);
             }
         }
 
-        public event EventHandler InputsUpdated;
-
-        public IDictionary<string, IInput> Inputs
+        public string CurrentSourceInfoKey
         {
-            get { return _inputs.ToDictionary(pair => pair.Key, pair => pair.Value as IInput); }
+            get
+            {
+                return _currentSourceListKey;
+            }
+            set
+            {
+                _currentSourceListKey = value;
+            }
         }
-
-        public string CurrentSourceInfoKey { get; set; }
 
         public SourceListItem CurrentSourceInfo
         {
@@ -664,7 +1000,6 @@ namespace PDT.Plugins.Marantz
             set
             {
                 if (value == _currentSourceItem) return;
-                CurrentSourceInfoKey = value.SourceListKey;
 
                 var handler = CurrentSourceChange;
 
@@ -678,16 +1013,40 @@ namespace PDT.Plugins.Marantz
             }
         }
 
+        private string _currentSourceListKey;
+
         private SourceListItem _currentSourceItem;
 
         public event SourceInfoChangeHandler CurrentSourceChange;
 
         public void ExecuteSwitch(object inputSelector)
         {
+
+            var inputToSend = (string)inputSelector;
+
             try
             {
-                var inputToSend = (string)inputSelector;
-                SetInput(inputToSend);
+                if (_powerIsOn)
+                {
+                    SetInput(inputToSend);
+                    return;
+                }
+
+
+                // One-time event handler to wait for power on before executing switch
+                EventHandler<FeedbackEventArgs> handler = null; // necessary to allow reference inside lambda to handler
+                handler = (o, a) =>
+                {
+                    if (_isWarmingUp)
+                    {
+                        return;
+                    }
+
+                    IsWarmingUpFeedback.OutputChange -= handler;
+                    SetInput(inputToSend);
+                };
+                IsWarmingUpFeedback.OutputChange += handler; // attach and wait for on FB
+                PowerOn();
             }
             catch (Exception ex)
             {
@@ -718,6 +1077,31 @@ namespace PDT.Plugins.Marantz
 
         public DeviceInfo DeviceInfo { get; private set; }
 
+        private int _warmingTimeMs = 5000;
+
+        private int _coolingTimeMs = 2000;
+
+        private bool _isWarmingUp;
+
+        private bool _isCoolingDown;
+
+        private CTimer _warmupTimer;
+
+        private CTimer _cooldownTimer;
+
+        public BoolFeedback IsWarmingUpFeedback { get; private set; }
+
+        public BoolFeedback IsCoolingDownFeedback { get; private set; }
+
         public event DeviceInfoChangeHandler DeviceInfoChanged;
     }
 }
+
+
+// Useful consol commands for testing
+// devjson:4 {"deviceKey":"avr", "methodName":"SendText", "params":["PW?"]}
+// setdevicestreamdebug:4 avr-com both 120
+// appdebug:4 2
+// devjson:4 {"deviceKey":"avr", "methodName":"SetVolume", "params":[1000]}
+// devjson:4 {"deviceKey":"avr", "methodName":"SendText", "params":["MV09"]}
+// devjson:4 { "deviceKey":"avr", "methodName":"SendText", "params":["CVFL 50"]}

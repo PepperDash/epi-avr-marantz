@@ -8,9 +8,9 @@ namespace PDT.Plugins.Marantz
         private static readonly IDictionary<string, SurroundChannel> Mappings =
             new Dictionary<string, SurroundChannel>(StringComparer.OrdinalIgnoreCase)
             {
-                {"FL", SurroundChannel.Left},
+                {"FL", SurroundChannel.FrontLeft},
                 {"C", SurroundChannel.Center},
-                {"FR", SurroundChannel.Right},
+                {"FR", SurroundChannel.FrontRight},
                 {"SL", SurroundChannel.SurroundLeft},
                 {"SR", SurroundChannel.SurroundRight},
                 {"SBL", SurroundChannel.SurroundBackLeft},
@@ -18,7 +18,7 @@ namespace PDT.Plugins.Marantz
                 {"SW", SurroundChannel.Subwoofer},
                 {"SB", SurroundChannel.SurroundBack},
                 {"FHL", SurroundChannel.FrontHeightLeft},
-                {"FHR", SurroundChannel.FrontHeighRight},
+                {"FHR", SurroundChannel.FrontHeightRight},
                 {"FWL", SurroundChannel.FrontWideLeft},
                 {"FWR", SurroundChannel.FrontWideRight},
                 {"TFL", SurroundChannel.TopFrontLeft},
@@ -39,7 +39,7 @@ namespace PDT.Plugins.Marantz
                 {"SHR", SurroundChannel.SurroundHeightRight},
                 {"TS", SurroundChannel.TopSurround},
                 {"CH", SurroundChannel.CenterHeight},
-                {"SW 2", SurroundChannel.Subwoofer2},
+                {"SW2", SurroundChannel.Subwoofer2},
             };
 
         public static SurroundChannel Parse(string surroundChannel)

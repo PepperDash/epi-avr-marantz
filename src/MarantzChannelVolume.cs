@@ -14,7 +14,22 @@ namespace PDT.Plugins.Marantz
         public int VolumeLevel
         {
             get { return _volumeLevel; }
-            set { _volumeLevel = value; VolumeLevelFeedback.FireUpdate(); }
+            set {
+                if(value == _volumeLevel) return;
+
+                _volumeLevel = value;
+                VolumeLevelFeedback.FireUpdate(); 
+            }
+        }
+
+
+        /// <summary>
+        /// The raw decimal volume of the channel from -12 (-120) to 12 (120) in decibels
+        /// </summary>
+        public int RawVolumeLevel { get
+            {
+                return CrestronEnvironment.ScaleWithLimits(VolumeLevel, 620, 380, 120, -120);
+            } 
         }
 
         public MarantzChannelVolume(string channelName, MarantzDevice parent)
@@ -26,7 +41,7 @@ namespace PDT.Plugins.Marantz
 
             // Main volume range = 38 - 62 | 0db = 50
             VolumeLevelFeedback = new IntFeedback(_channelName + "-Volume", () =>
-                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 62, 38, int.MaxValue, int.MinValue));
+                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 620, 380, 65535, 0));
 
             MuteFeedback = new BoolFeedback(_channelName + "-Mute", () => VolumeLevelFeedback.IntValue == 0);
 
@@ -55,10 +70,10 @@ namespace PDT.Plugins.Marantz
             using (var wh = new CEvent(true, false))
             {
                 var level = device.VolumeLevel;
-                while (device._rampVolumeUp && level < 62)
+                while (device._rampVolumeUp && level < 620)
                 {
-                    ++level;
-                    var request = MarantzUtils.ChannelVolumeCommand(device._channelName, level);
+                    var newLevel = level + 5;
+                    var request = MarantzUtils.ChannelVolumeCommand(device._channelName, newLevel);
                     device._parent.SendText(request);
                     wh.Wait(50);
                 }
@@ -88,10 +103,10 @@ namespace PDT.Plugins.Marantz
             using (var wh = new CEvent(true, false))
             {
                 var level = device.VolumeLevel;
-                while (device._rampVolumeDown && level > 38)
+                while (device._rampVolumeDown && level > 380)
                 {
-                    --level;
-                    var request = MarantzUtils.ChannelVolumeCommand(device._channelName, level);
+                    var newLevel = level - 5;
+                    var request = MarantzUtils.ChannelVolumeCommand(device._channelName, newLevel);
                     device._parent.SendText(request);
                     wh.Wait(50);
                 }
@@ -123,7 +138,7 @@ namespace PDT.Plugins.Marantz
 
         public void SetVolume(ushort level)
         {
-            var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, uint.MaxValue, uint.MinValue, 62, 38);
+            var desiredLevel = CrestronEnvironment.ScaleWithLimits(level, 65535, 0, 620, 380);
             var request = MarantzUtils.ChannelVolumeCommand(_channelName, (int)desiredLevel);
             _parent.SendText(request);
         }
@@ -134,7 +149,10 @@ namespace PDT.Plugins.Marantz
 
         public void ParseResponse(string response)
         {
-            VolumeLevel = int.Parse(response);
+            var level = int.Parse(response);
+
+            if (response.Length <= 2) VolumeLevel = level * 10;
+            else VolumeLevel = level;
         }
 
         public string Key { get; private set; }

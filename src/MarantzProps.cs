@@ -44,5 +44,8 @@ namespace PDT.Plugins.Marantz
 
         [JsonProperty("monitor")]
         public CommunicationMonitorConfig Monitor { get; set; }
+
+		[JsonProperty("enableZone2")]
+		public bool EnableZone2 { get; set; }
 	}
 }
