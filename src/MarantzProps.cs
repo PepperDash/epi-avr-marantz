@@ -42,10 +42,13 @@ namespace PDT.Plugins.Marantz
 		[JsonProperty("control")]
 		public EssentialsControlPropertiesConfig Control { get; set; }
 
-        [JsonProperty("monitor")]
-        public CommunicationMonitorConfig Monitor { get; set; }
+		[JsonProperty("monitor")]
+		public CommunicationMonitorConfig Monitor { get; set; }
 
 		[JsonProperty("enableZone2")]
 		public bool EnableZone2 { get; set; }
+
+		[JsonProperty("rampRepeatTimeMs")]
+		public int RampRepeatTimeMs { get; set; }
 	}
 }

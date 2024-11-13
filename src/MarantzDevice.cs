@@ -40,6 +40,7 @@ namespace PDT.Plugins.Marantz
         private readonly IBasicCommunication _comms;
         private readonly GenericCommunicationMonitor _commsMonitor;
         private readonly Dictionary<SurroundChannel, MarantzChannelVolume> _surroundChannels;
+        private readonly int _rampRepeatTimeMs;
 
         private MarantzZone2 _zone2;
 
@@ -165,6 +166,7 @@ namespace PDT.Plugins.Marantz
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
         {
+            _rampRepeatTimeMs = config.RampRepeatTimeMs == 0 ? 250 : config.RampRepeatTimeMs;
             try
             {
                 _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
@@ -850,7 +852,7 @@ namespace PDT.Plugins.Marantz
                     newLevel += 5;
                     var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
-                    wh.Wait(100);
+                    wh.Wait(device._rampRepeatTimeMs);
                 }
             }
         }
@@ -887,7 +889,7 @@ namespace PDT.Plugins.Marantz
                     newLevel -= 5;
                     var request = MarantzUtils.VolumeCommand(newLevel, "MV");
                     device.SendText(request);
-                    wh.Wait(100);
+                    wh.Wait(device._rampRepeatTimeMs);
                 }
             }
         }
