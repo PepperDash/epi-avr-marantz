@@ -2,14 +2,17 @@
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzSurroundModes : ISelectableItems<string>
+    public class MarantzSurroundModes : ISelectableItems<eSurroundModes>
     {
-        private Dictionary<string, ISelectableItem> _items = new Dictionary<string, ISelectableItem>();
+        private Dictionary<eSurroundModes, ISelectableItem> _items = new Dictionary<eSurroundModes, ISelectableItem>();
 
-        public Dictionary<string, ISelectableItem> Items
+        public Dictionary<eSurroundModes, ISelectableItem> Items
         {
             get
             {
@@ -22,13 +25,13 @@ namespace PDT.Plugins.Marantz
 
                 _items = value;
 
-                ItemsUpdated?.Invoke(this, EventArgs.Empty);
+                ItemsUpdated?.Invoke(this, null);
             }
         }
 
-        private string _currentItem = "Unknown";
+        private eSurroundModes _currentItem;
 
-        public string CurrentItem
+        public eSurroundModes CurrentItem
         {
             get
             {
@@ -41,7 +44,7 @@ namespace PDT.Plugins.Marantz
 
                 _currentItem = value;
 
-                CurrentItemChanged?.Invoke(this, EventArgs.Empty);
+                CurrentItemChanged?.Invoke(this, null);
             }
         }
 

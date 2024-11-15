@@ -1,6 +1,7 @@
 ﻿using Crestron.SimplSharp;
 using Crestron.SimplSharpPro.CrestronThread;
 using Crestron.SimplSharpPro.DeviceSupport;
+using Crestron.SimplSharpPro.GeneralIO;
 using PepperDash.Core;
 using PepperDash.Essentials.AppServer.Messengers;
 using PepperDash.Essentials.Core;
@@ -33,7 +34,7 @@ namespace PDT.Plugins.Marantz
         IHasInputs<string>,
         IRoutingSinkWithSwitching,
         IDeviceInfoProvider,
-        IHasSurroundSoundModes<string, string>,
+        IHasSurroundSoundModes<eSurroundModes, string>,
         IWarmingCooling
     {
         private readonly IBasicCommunication _comms;
@@ -43,7 +44,7 @@ namespace PDT.Plugins.Marantz
 
         private MarantzZone2 _zone2;
 
-        public ISelectableItems<string> SurroundSoundModes { get; private set; }
+        public ISelectableItems<eSurroundModes> SurroundSoundModes { get; private set; }
 
         public ISelectableItems<string> Inputs { get; private set; }
 
@@ -165,7 +166,7 @@ namespace PDT.Plugins.Marantz
         public MarantzDevice(string key, string name, MarantzProps config, IBasicCommunication comms)
             : base(key, name)
         {
-            _rampRepeatTimeMs = config.RampRepeatTimeMs == 0 ? 125 : config.RampRepeatTimeMs;
+            _rampRepeatTimeMs = config.RampRepeatTimeMs == 0 ? 250 : config.RampRepeatTimeMs;
             try
             {
                 _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
@@ -230,7 +231,7 @@ namespace PDT.Plugins.Marantz
                 return base.CustomActivate();
             }
 
-            var surroundModeMessenger = new ISelectableItemsMessenger<string>
+            var surroundModeMessenger = new ISelectableItemsMessenger<eSurroundModes>
                 (string.Format("{0}-surroundSoundModes-plugin", Key),
                 string.Format("/device/{0}", Key),
                 this.SurroundSoundModes, "surroundSoundModes");
@@ -324,25 +325,21 @@ namespace PDT.Plugins.Marantz
             SurroundSoundModes = new MarantzSurroundModes
             {
 
-                Items = new Dictionary<string, ISelectableItem>
+                Items = new Dictionary<eSurroundModes, ISelectableItem>
                 {
-                    {"Movie", new MarantzSurroundMode("movie", "Movie", this, "MOVIE")},
-                    {"Music", new MarantzSurroundMode("music", "Music", this, "MUSIC")},
-                    {"Game", new MarantzSurroundMode("game", "Game", this, "GAME")},
-                    {"Pure", new MarantzSurroundMode("pure", "Pure", this, "PURE DIRECT")},
-                    //{eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
-                    //{eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
-                    // {eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
-                    //{eSurroundModes.Matrix, new MarantzSurroundMode(eSurroundModes.Matrix.ToString(), "Matrix", this, "MATRIX")},
-                    // {eSurroundModes.MonoMovie, new MarantzSurroundMode(eSurroundModes.MonoMovie.ToString(), "Mono Movie", this, "MONO MOVIE")},
-                    //{eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
-                    // {eSurroundModes.MultiChannelIn, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel In", this, "MULTI CH IN")},
-                    //{eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
-                    // {eSurroundModes.RockArena, new MarantzSurroundMode(eSurroundModes.RockArena.ToString(), "Rock Arena", this, "ROCK ARENA")},
-                    //{eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
-                    //{eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
-                    //{eSurroundModes.VideoGame, new MarantzSurroundMode(eSurroundModes.VideoGame.ToString(), "Video Game", this, "VIDEO GAME")},
-                    //{eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
+                    {eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
+                    {eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY")},
+                    {eSurroundModes.DTS, new MarantzSurroundMode(eSurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS")},
+                    //{eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
+                    {eSurroundModes.Matrix, new MarantzSurroundMode(eSurroundModes.Matrix.ToString(), "Matrix", this, "MATRIX")},
+                    //{eSurroundModes.MonoMovie, new MarantzSurroundMode(eSurroundModes.MonoMovie.ToString(), "Mono Movie", this, "MONO MOVIE")},
+                    {eSurroundModes.MultiChannelStereo, new MarantzSurroundMode(eSurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
+                    {eSurroundModes.PureDirect, new MarantzSurroundMode(eSurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
+                    //{eSurroundModes.RockArena, new MarantzSurroundMode(eSurroundModes.RockArena.ToString(), "Rock Arena", this, "ROCK ARENA")},
+                    {eSurroundModes.Standard, new MarantzSurroundMode(eSurroundModes.Standard.ToString(), "Standard", this, "STANDARD")},
+                    {eSurroundModes.Stereo, new MarantzSurroundMode(eSurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
+                    {eSurroundModes.VideoGame, new MarantzSurroundMode(eSurroundModes.VideoGame.ToString(), "Video Game", this, "VIDEO GAME")},
+                    {eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
                 }
             };
 
@@ -646,10 +643,37 @@ namespace PDT.Plugins.Marantz
                 // MSDOLBY PLII MV<CR>
                 try
                 {
-                    var surroundMode = rx.Substring(2).Trim();
+                    var surroundMode = rx.Substring(2);
 
-                    Debug.Console(2, this, "surroundMode: {0}", surroundMode);
-                    SurroundSoundModes.CurrentItem = surroundMode;
+                    //Debug.Console(2, this, "surroundMode: {0}", surroundMode);
+
+                    var matchString = surroundMode;
+
+                    //Debug.Console(2, this, "matchString: {0}", matchString);
+
+                    var mode = SurroundSoundModes.Items.FirstOrDefault
+                        (x => matchString.StartsWith(((x.Value) as MarantzSurroundMode).MatchString));
+
+
+                    if (mode.Value != null)
+                    {
+                        // must set this first, as the mode select will fire an event
+                        SurroundSoundModes.CurrentItem = mode.Key;
+
+                        foreach (var item in SurroundSoundModes.Items)
+                        {
+                            var isSelected = item.Key.Equals(mode.Key);
+                            item.Value.IsSelected = isSelected;
+                        }
+;
+                    }
+                    else
+                    {
+                        SurroundSoundModes.CurrentItem = eSurroundModes.Unknown;
+                        SurroundSoundModes.Items.All(x => x.Value.IsSelected = false);
+                        Debug.Console(2, this, "Unknown Surround Mode: {0}", surroundMode);
+                    }
+
                 }
                 catch (Exception ex)
                 {

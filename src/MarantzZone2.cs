@@ -140,14 +140,6 @@ namespace PDT.Plugins.Marantz
             SetupConsoleCommands();
 
             SetupFeedbacks();
-
-            parent.CommunicationMonitor.IsOnlineFeedback.OutputChange += (sender, args) =>
-            {
-                if (args.BoolValue)
-                {
-                    SetInput("SOURCE");
-                }
-            };
         }
 
         private void SetupInputs()
