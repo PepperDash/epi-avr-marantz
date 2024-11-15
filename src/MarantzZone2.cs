@@ -33,6 +33,8 @@ namespace PDT.Plugins.Marantz
                     return;
                 _powerIsOn = value;
                 PowerIsOnFeedback.FireUpdate();
+                VolumeLevelFeedback.FireUpdate();
+
                 if (_powerIsOn)
                 {
                     _isWarmingUp = false;
@@ -201,8 +203,7 @@ namespace PDT.Plugins.Marantz
             PowerIsOnFeedback = new BoolFeedback("PowerIsOn", () => PowerIsOn);
 
             // Main volume range = 0 - 98
-            VolumeLevelFeedback = new IntFeedback("Volume", () =>
-                CrestronEnvironment.ScaleWithLimits(VolumeLevel, 980, 0, 65535, 0));
+            VolumeLevelFeedback = new IntFeedback("Volume", () => PowerIsOn ? CrestronEnvironment.ScaleWithLimits(VolumeLevel, 980, 0, 65535, 0) : 0);
 
             MuteFeedback = new BoolFeedback("Mute", () => MuteIsOn);
 
@@ -355,13 +356,13 @@ namespace PDT.Plugins.Marantz
 
             using (var wh = new CEvent(true, false))
             {
-                var level = device.VolumeLevel;
-                while (device._rampVolumeUp && level < 980)
+                var newLevel = device.VolumeLevel;
+                while (device._rampVolumeUp && newLevel < 980)
                 {
-                    var newLevel = level + 5;
+                    newLevel += 5;
                     var request = MarantzUtils.VolumeCommand(newLevel, "Z2");
                     device._parent.SendText(request);
-                    wh.Wait(50);
+                    wh.Wait(125);
                 }
             }
         }
@@ -392,10 +393,10 @@ namespace PDT.Plugins.Marantz
 
             using (var wh = new CEvent(true, false))
             {
-                var level = device.VolumeLevel;
-                while (device._rampVolumeDown && level > 0)
+                var newLevel = device.VolumeLevel;
+                while (device._rampVolumeDown && newLevel > 0)
                 {
-                    var newLevel = level - 5;
+                    newLevel -= 5;
                     var request = MarantzUtils.VolumeCommand(newLevel, "Z2");
                     device._parent.SendText(request);
                     wh.Wait(50);

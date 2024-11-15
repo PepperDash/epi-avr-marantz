@@ -18,6 +18,8 @@ namespace PDT.Plugins.Marantz
         DolbyDigital,
         DTS,
         MultiChannelStereo,
+        MultiChannelIn,
+        MultiChannelDSurround,
         RockArena,
         JazzClub,
         MonoMovie,

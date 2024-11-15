@@ -58,7 +58,7 @@ namespace PDT.Plugins.Marantz
         private bool _isSelected;
 
         private readonly string _command;
-        private readonly string _matchString;
+        private readonly string[] _matchStrings;
         private readonly MarantzDevice _parent;
 
         public string Key { get; private set; }
@@ -74,21 +74,15 @@ namespace PDT.Plugins.Marantz
         }
 
         [JsonIgnore]
-        public string MatchString
-        {
-            get
-            {
-                return _matchString;
-            }
-        }
+        public string[] MatchStrings => _matchStrings.ToArray();
 
-        public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, string matchString = "")
+        public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, params string[] matchStrings)
         {
-            Key = key;
-            Name = name;
-            _parent = parent;
-            _command = command;
-            _matchString = string.IsNullOrEmpty(matchString) ? command : matchString;
+            Key           = key;
+            Name          = name;
+            _parent       = parent;
+            _command      = command;
+            _matchStrings = matchStrings.Length == 0 ? new []{ command } : matchStrings;
         }
 
         public event EventHandler ItemUpdated;
