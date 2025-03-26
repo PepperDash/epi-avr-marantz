@@ -76,6 +76,7 @@ namespace PDT.Plugins.Marantz
                     var request = MarantzUtils.ChannelVolumeCommand(device._channelName, newLevel);
                     device._parent.SendText(request);
                     wh.Wait(50);
+                    level = newLevel;
                 }
             }
         }
@@ -109,6 +110,7 @@ namespace PDT.Plugins.Marantz
                     var request = MarantzUtils.ChannelVolumeCommand(device._channelName, newLevel);
                     device._parent.SendText(request);
                     wh.Wait(50);
+                    level = newLevel;
                 }
             }
         }
