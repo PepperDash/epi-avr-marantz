@@ -1,0 +1,39 @@
+﻿namespace PDT.Plugins.Marantz
+{
+    public enum SurroundChannel
+    {
+        FrontLeft, 
+        Center, 
+        FrontRight, 
+        SurroundLeft, 
+        SurroundRight, 
+        SurroundBackLeft, 
+        SurroundBackRight, 
+        Subwoofer, 
+        SurroundBack, 
+        FrontHeightLeft, 
+        FrontHeightRight, 
+        FrontWideLeft, 
+        FrontWideRight,
+        TopFrontLeft, 
+        TopFrontRight,
+        TopMiddleLeft, 
+        TopMiddleRight, 
+        TopRearLeft, 
+        TopRearRight, 
+        RearHeightLeft, 
+        RearHeightRight, 
+        FrontDolbyLeft, 
+        FrontDolbyRight, 
+        SurroundDolbyLeft, 
+        SurroundDolbyRight,
+        BackDolbyLeft, 
+        BackDolbyRight, 
+        SurroundHeightLeft, 
+        SurroundHeightRight, 
+        TopSurround, 
+        CenterHeight, 
+        Subwoofer2, 
+        Unknown
+    }
+}

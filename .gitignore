@@ -357,3 +357,4 @@ MigrationBackup/
 *.clz
 *.projectinfo
 *.suo
+/._PDT.Plugins.Marantz.4Series.sln
