@@ -223,12 +223,18 @@ namespace PDT.Plugins.Marantz
 
         public override bool CustomActivate()
         {
-            // Check for mobile control and add the custom messengers 
+            // moved messenger creation to method from base class. That does require moving the call to base.CustomActivate() to the end of this method
+
+            return base.CustomActivate();
+        }
+
+        protected override void CreateMobileControlMessengers()
+        {
             var mc = DeviceManager.AllDevices.OfType<IMobileControl>().FirstOrDefault();
 
             if (mc == null)
             {
-                return base.CustomActivate();
+                return;
             }
 
             var surroundModeMessenger = new ISelectableItemsMessenger<eSurroundModes>
@@ -244,38 +250,6 @@ namespace PDT.Plugins.Marantz
             mc.AddDeviceMessenger(surroundChannelMessenger);
 
             // Inputs messenger should be automatically added by the MC plugin
-
-            return base.CustomActivate();
-        }
-
-        /// <summary>
-        /// Attempts to add a messenger for the surround channel
-        /// </summary>
-        /// <param name="channel"></param>
-        private void AddSurroundChannelMessenger(SurroundChannel channel)
-        {
-            try
-            {
-                var mc = DeviceManager.AllDevices.OfType<IMobileControl>().FirstOrDefault();
-
-                if (mc == null)
-                {
-                    return;
-                }
-
-                if (_surroundChannels.TryGetValue(channel, out var channelValue))
-                {
-                    var channelMessenger = new DeviceVolumeMessenger(
-                        string.Format("{0}-{1}-channelVolume-plugin", Key, channel.ToString()),
-                        string.Format("/device/{0}/{1}", Key, channel.ToString()),
-                        channelValue);
-                    mc.AddDeviceMessenger(channelMessenger);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.Console(0, this, "Error adding channel volume messengers: {0}", e);
-            }
         }
 
         private void SetupInputs()
