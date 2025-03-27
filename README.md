@@ -15,7 +15,7 @@ zone 2 controls via IP connection
     "type": "marantzAvr",
     "properties": {
         "control": {
-            "method": "tcpIp"
+            "method": "tcpIp",
             "tcpSshProperties": {
                 "port": 23,
                 "address": "",
