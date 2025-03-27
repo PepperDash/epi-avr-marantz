@@ -9,7 +9,7 @@ namespace PDT.Plugins.Marantz
     {
         public MarantzDeviceFactory()
         {
-            MinimumEssentialsFrameworkVersion = "1.15.2";
+            MinimumEssentialsFrameworkVersion = "2.1.0";
             TypeNames = new List<string>() {"MarantzAvr"};
         }
 
