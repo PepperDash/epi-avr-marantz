@@ -20,6 +20,7 @@ jobs:
   #     channel: ${{ needs.getVersion.outputs.channel }}
   build-4Series:
     uses: PepperDash/workflow-templates/.github/workflows/essentialsplugins-4Series-builds.yml@main
+    if: needs.getVersion.outputs.newVersion == 'true'
     secrets: inherit
     needs: getVersion
     with:
