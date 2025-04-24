@@ -1,14 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using PepperDash.Core;
-
-namespace PDT.Plugins.Marantz
+﻿namespace PDT.Plugins.Marantz
 {
-    public enum eSurroundModes
+    public enum SurroundModes
     {
         Unknown,
         Direct,

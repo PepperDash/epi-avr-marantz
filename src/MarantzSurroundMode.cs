@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using PepperDash.Core;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using System;
 using System.Collections.Generic;
@@ -8,11 +9,15 @@ using System.Threading.Tasks;
 
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzSurroundModes : ISelectableItems<eSurroundModes>
+    public class MarantzSurroundModes : ISelectableItems<SurroundModes>, IKeyName
     {
-        private Dictionary<eSurroundModes, ISelectableItem> _items = new Dictionary<eSurroundModes, ISelectableItem>();
+        public string Key { get; private set; }
 
-        public Dictionary<eSurroundModes, ISelectableItem> Items
+        public string Name { get; private set; }
+
+        private Dictionary<SurroundModes, ISelectableItem> _items = new Dictionary<SurroundModes, ISelectableItem>();
+
+        public Dictionary<SurroundModes, ISelectableItem> Items
         {
             get
             {
@@ -29,9 +34,9 @@ namespace PDT.Plugins.Marantz
             }
         }
 
-        private eSurroundModes _currentItem;
+        private SurroundModes _currentItem;
 
-        public eSurroundModes CurrentItem
+        public SurroundModes CurrentItem
         {
             get
             {
@@ -51,6 +56,11 @@ namespace PDT.Plugins.Marantz
         public event EventHandler ItemsUpdated;
         public event EventHandler CurrentItemChanged;
 
+        public MarantzSurroundModes(string key, string name)
+        {
+            Key = key;
+            Name = name;
+        }
     }
 
     public class MarantzSurroundMode : ISelectableItem
@@ -96,10 +106,7 @@ namespace PDT.Plugins.Marantz
                     return;
 
                 _isSelected = value;
-
-                var handler = ItemUpdated;
-                if (handler != null)
-                    handler(this, EventArgs.Empty);
+                ItemUpdated?.Invoke(this, EventArgs.Empty);
             }
         }
 

@@ -6,6 +6,7 @@ using System.Text;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using Crestron.SimplSharp;
 using PepperDash.Core;
+using PepperDash.Core.Logging;
 
 
 namespace PDT.Plugins.Marantz
@@ -16,7 +17,7 @@ namespace PDT.Plugins.Marantz
         IHasInputs<string>,
         IWarmingCooling
     {
-        private MarantzDevice _parent;
+        private readonly MarantzDevice _parent;
 
         public ISelectableItems<string> Inputs { get; private set; }
 
@@ -88,7 +89,7 @@ namespace PDT.Plugins.Marantz
                 if (value == _volumeLevel)
                     return;
                 _volumeLevel = value;
-                Debug.Console(2, this, " Volume Level: {0}", _volumeLevel);
+                this.LogVerbose(" Volume Level: {volumeLevel}", _volumeLevel);
                 VolumeLevelFeedback.FireUpdate();
             }
         }
@@ -218,28 +219,7 @@ namespace PDT.Plugins.Marantz
                 IsCoolingDownFeedback,
                 IsWarmingUpFeedback,
                 VolumeLevelFeedback,
-            };
-
-            Feedbacks.Where(f => !string.IsNullOrEmpty(f.Key))
-                .ToList()
-                .ForEach(f =>
-                {
-                    if (f is StringFeedback)
-                    {
-                        f.OutputChange +=
-                            (sender, args) => Debug.Console(1, this, "[{0}] - {1}", f.Key, args.StringValue);
-                    }
-
-                    if (f is IntFeedback)
-                    {
-                        f.OutputChange += (sender, args) => Debug.Console(1, this, "[{0}] - {1}", f.Key, args.IntValue);
-                    }
-
-                    if (f is BoolFeedback)
-                    {
-                        f.OutputChange += (sender, args) => Debug.Console(1, this, "[{0}] - {1}", f.Key, args.BoolValue);
-                    }
-                });
+            };            
         }
 
         internal void ParseRx(string rx)
@@ -384,12 +364,8 @@ namespace PDT.Plugins.Marantz
         }
 
         private static void RampVolumeDown(object state)
-        {
-            Debug.Console(2, "ramping volume down...");
-
-            var device = (MarantzZone2)state;
-
-            Debug.Console(2, "Volume Level: {0}", device.VolumeLevel);
+        {            
+            var device = (MarantzZone2)state;            
 
             using (var wh = new CEvent(true, false))
             {
@@ -446,9 +422,9 @@ namespace PDT.Plugins.Marantz
 
         public FeedbackCollection<Feedback> Feedbacks { get; private set; }
 
-        private int _warmingTimeMs = 5000;
+        private readonly int _warmingTimeMs = 5000;
 
-        private int _coolingTimeMs = 2000;
+        private readonly int _coolingTimeMs = 2000;
 
         private bool _isWarmingUp;
 

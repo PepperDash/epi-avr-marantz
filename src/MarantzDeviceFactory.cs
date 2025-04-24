@@ -9,13 +9,13 @@ namespace PDT.Plugins.Marantz
     {
         public MarantzDeviceFactory()
         {
-            MinimumEssentialsFrameworkVersion = "2.1.0";
+            MinimumEssentialsFrameworkVersion = "2.4.4";
             TypeNames = new List<string>() {"MarantzAvr"};
         }
 
         public override EssentialsDevice BuildDevice(PepperDash.Essentials.Core.Config.DeviceConfig dc)
         {
-            Debug.Console(1, "[{0}] Factory Attempting to create new device from type: {1}", dc.Key, dc.Type);
+            Debug.LogDebug("[{Key}] Factory Attempting to create new device from type: {type}", dc.Key, dc.Type);
 
             var propertiesConfig = dc.Properties.ToObject<MarantzProps>();
 
@@ -23,8 +23,8 @@ namespace PDT.Plugins.Marantz
             if (comms != null) 
                 return new MarantzDevice(dc.Key, dc.Name, propertiesConfig, comms);
 
-            Debug.Console(1, "[{0}] Factory Notice: No control object present for device {1}", dc.Key, dc.Name);
-            throw new Exception(string.Format("No control object present for device: {0}", dc.Key));
+            Debug.LogDebug("[{Key}] Factory Notice: No control object present for device {Name}", dc.Key, dc.Name);
+            throw new Exception($"No control object present for device: {dc.Key}");
         }
     }
 }
