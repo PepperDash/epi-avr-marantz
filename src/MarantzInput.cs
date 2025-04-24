@@ -84,9 +84,7 @@ namespace PDT.Plugins.Marantz
                     return;
 
                 _isSelected = value;
-                var handler = ItemUpdated;
-                if (handler != null)
-                    handler(this, EventArgs.Empty);
+                ItemUpdated?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -125,9 +123,7 @@ namespace PDT.Plugins.Marantz
                     return;
 
                 _isSelected = value;
-                var handler = ItemUpdated;
-                if (handler != null)
-                    handler(this, EventArgs.Empty);
+                ItemUpdated?.Invoke(this, EventArgs.Empty);
             }
         }
 
