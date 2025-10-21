@@ -237,11 +237,6 @@ namespace PDT.Plugins.Marantz
                 return;
             }
 
-            //var surroundModeMessenger = new ISelectableItemsMessenger<eSurroundModes>
-            //    (string.Format("{0}-surroundSoundModes-plugin", Key),
-            //    string.Format("/device/{0}", Key),
-            //    SurroundSoundModes, "surroundSoundModes");
-
             var surroundModeMessenger = new SurroundModesMessenger<SurroundModes>
                 ($"{Key}-surroundSoundModes-plugin",
                 $"/device/{Key}",
@@ -302,7 +297,7 @@ namespace PDT.Plugins.Marantz
         private void SetupDefaultSurroundModes()
         {
             // Denon AVR-2311CI Surround Modes
-            SurroundSoundModes = new MarantzSurroundModes($"{Key}-surroundModes", $"{Key} Surround Modes")
+            SurroundSoundModes = new MarantzSurroundModes($"{Key}-surroundModes", Key)
             {
 
                 Items = new Dictionary<SurroundModes, ISelectableItem>
