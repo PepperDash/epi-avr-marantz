@@ -341,7 +341,7 @@ namespace PDT.Plugins.Marantz
                     { SurroundModes.DolbyDigital, new MarantzSurroundMode(SurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DSUR") },
                     { SurroundModes.PureDirect, new MarantzSurroundMode(SurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT") },
                     { SurroundModes.Stereo, new MarantzSurroundMode(SurroundModes.Stereo.ToString(), "Stereo", this, "STEREO") },
-                    { SurroundModes.DTS, new MarantzSurroundMode(SurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "NEURAL") },
+                    { SurroundModes.DTS, new MarantzSurroundMode(SurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "DTS", "NEURAL") },
                     //{eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
                     //{eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY", "DSUR")},
                     //{eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
@@ -642,7 +642,7 @@ namespace PDT.Plugins.Marantz
                 {
                     var surroundMode = rx.Substring(2);
 
-                    //Debug.Console(2, this, "surroundMode: {0}", surroundMode);
+                    this.LogVerbose("ParseResponse: surroundMode '{0}'", surroundMode);
 
                     var matchString = surroundMode;
 
