@@ -49,6 +49,8 @@ namespace PDT.Plugins.Marantz
 
         public ISelectableItems<string> Inputs { get; private set; }
 
+        private readonly List<InputConfig> inputs;
+
 
         private readonly GenericQueue _receiveQueue;
 
@@ -170,6 +172,7 @@ namespace PDT.Plugins.Marantz
             _rampRepeatTimeMs = config.RampRepeatTimeMs == 0 ? 250 : config.RampRepeatTimeMs;
             try
             {
+                inputs = config.Inputs;
                 _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
 
                 DeviceInfo = new DeviceInfo();
@@ -265,6 +268,8 @@ namespace PDT.Plugins.Marantz
                     {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
                     {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
                     {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
+                    {"GAME1", new MarantzInput("GAME1", "GAME1", this, "GAME1")},
+                    {"GAME2", new MarantzInput("GAME2", "GAME2", this, "GAME2")},
                     {"8K", new MarantzInput("8K", "8K", this, "8K")},
                     {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
                     {"AUX2", new MarantzInput("AUX2", "AUX2", this, "AUX2")},
@@ -273,6 +278,7 @@ namespace PDT.Plugins.Marantz
                     //{"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
                     //{"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
                     //{"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
+                    {"AUX8K", new MarantzInput("AUX8K", "AUX2", this, "AUX8K")},
                     {"CD", new MarantzInput("CD", "CD", this, "CD")},
                     //{"PHONO", new MarantzInput("PHONO", "PHONO", this, "PHONO")},
                     //{"TUNER", new MarantzInput("TUNER", "TUNER", this, "TUNER")},
@@ -281,6 +287,27 @@ namespace PDT.Plugins.Marantz
                     {"BT", new MarantzInput("BT", "BT", this, "BT")},
                 }
             };
+
+            SetupConfiguredInputs(inputs);
+        }
+
+        private void SetupConfiguredInputs(List<InputConfig> inputs)
+        {
+            if (inputs == null || Inputs == null || Inputs.Items == null)
+                return;
+                
+            foreach(var input in inputs)
+            {
+                if (input.HideInput && Inputs.Items.ContainsKey(input.inputKey))
+                {
+                    Inputs.Items.Remove(input.inputKey);
+                }
+                else if (Inputs.Items.TryGetValue(input.inputKey, out ISelectableItem item))
+                {
+                    var updatedInput = new MarantzInput(item.Key, input.Name, this, ((MarantzInput)item).InputCommand);
+                    Inputs.Items[input.inputKey] = updatedInput;
+                }
+            }
         }
 
         public void SetDefaultChannelLevels()
@@ -364,36 +391,24 @@ namespace PDT.Plugins.Marantz
                 new RoutingInputPort("CD", eRoutingSignalType.Audio, eRoutingPortConnectionType.LineAudio, "CD", this),
                 new RoutingInputPort("DVD", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "DVD", this),
                 new RoutingInputPort("TV", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TV", this),
-                new RoutingInputPort("SAT/CBL", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi,
-                    "SAT/CBL",
-                    this),
-                new RoutingInputPort("MPLAY", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "MPLAY",
-                    this),
-                new RoutingInputPort("GAME", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME",
-                    this),
+                new RoutingInputPort("SAT/CBL", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "SAT/CBL", this),
+                new RoutingInputPort("MPLAY", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "MPLAY", this),
+                new RoutingInputPort("GAME", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME", this),
+                new RoutingInputPort("GAME1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME1", this),
+                new RoutingInputPort("GAME2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME2", this),
                 new RoutingInputPort("8K", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "8K", this),
-                new RoutingInputPort("TUNER", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TUNER",
-                    this),
-                new RoutingInputPort("HDRADIO", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi,
-                    "HDRADIO", this),
-                new RoutingInputPort("PHONO", eRoutingSignalType.Audio, eRoutingPortConnectionType.LineAudio, "PHONO",
-                    this),
-                new RoutingInputPort("AUX1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX1",
-                    this),
-                new RoutingInputPort("AUX2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX2",
-                    this),
-                new RoutingInputPort("AUX3", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX3",
-                    this),
-                new RoutingInputPort("AUX4", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX4",
-                    this),
-                new RoutingInputPort("AUX5", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX5",
-                    this),
-                new RoutingInputPort("AUX6", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX6",
-                    this),
-                new RoutingInputPort("AUX7", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX7",
-                    this),
-                new RoutingInputPort("NET", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Streaming, "NET",
-                    this),
+                new RoutingInputPort("TUNER", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TUNER", this),
+                new RoutingInputPort("HDRADIO", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "HDRADIO", this),
+                new RoutingInputPort("PHONO", eRoutingSignalType.Audio, eRoutingPortConnectionType.LineAudio, "PHONO", this),
+                new RoutingInputPort("AUX1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX1", this),
+                new RoutingInputPort("AUX2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX2", this),
+                new RoutingInputPort("AUX3", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX3", this),
+                new RoutingInputPort("AUX4", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX4", this),
+                new RoutingInputPort("AUX5", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX5", this),
+                new RoutingInputPort("AUX6", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX6", this),
+                new RoutingInputPort("AUX7", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX7", this),
+                new RoutingInputPort("AUX8K", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX8K", this),
+                new RoutingInputPort("NET", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Streaming, "NET", this),
                 new RoutingInputPort("BT", eRoutingSignalType.Audio, eRoutingPortConnectionType.Streaming, "BT", this),
             };
 

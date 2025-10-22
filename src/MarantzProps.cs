@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using PepperDash.Essentials.Core;
+using System.Collections.Generic;
 
 namespace PDT.Plugins.Marantz
 {
@@ -16,7 +17,7 @@ namespace PDT.Plugins.Marantz
 		/// <example>
 		/// <code>
 		/// "control": {
-        ///		"method": "tcpIp",
+		///		"method": "tcpIp",
 		///		"controlPortDevKey": "processor",
 		///		"controlPortNumber": 1,
 		///		"comParams": {
@@ -50,5 +51,25 @@ namespace PDT.Plugins.Marantz
 
 		[JsonProperty("rampRepeatTimeMs")]
 		public int RampRepeatTimeMs { get; set; }
+
+		[JsonProperty("inputs")]
+		public List<InputConfig> Inputs { get; set; }
+
+		public MarantzProps()
+		{
+			Inputs = new List<InputConfig>();
+		}
+	}
+	
+	public class InputConfig
+	{
+		[JsonProperty("name")]
+		public string Name { get; set; }
+
+		[JsonProperty("inputKey")]
+		public string inputKey { get; set; }
+
+		[JsonProperty("hideInput")]
+		public bool HideInput { get; set; }
 	}
 }

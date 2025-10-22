@@ -59,7 +59,7 @@ namespace PDT.Plugins.Marantz
     {
         private bool _isSelected;
 
-        private readonly string _inputCommand;
+        public string InputCommand { get; private set; }
         private readonly MarantzDevice _parent;
 
         public MarantzInput(string key, string name, MarantzDevice parent, string inputCommand)
@@ -67,7 +67,7 @@ namespace PDT.Plugins.Marantz
             Key = key;
             Name = name;
             _parent = parent;
-            _inputCommand = inputCommand;
+            InputCommand = inputCommand;
         }
 
         public string Key { get; private set; }
@@ -90,7 +90,7 @@ namespace PDT.Plugins.Marantz
 
         public void Select()
         {
-            _parent.SetInput(_inputCommand);
+            _parent.SetInput(InputCommand);
         }
     }
 
