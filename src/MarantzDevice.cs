@@ -389,22 +389,21 @@ namespace PDT.Plugins.Marantz
                     return;
 
                 foreach (var mode in surroundModes)
+            {
+                if (!mode.HideMode) continue;
+                
+                var key = (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey);
+                if (SurroundSoundModes.Items.ContainsKey(key))
                 {
-                    if (mode.HideMode)
-                    {
-                        var key = (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey);
-                        if (SurroundSoundModes.Items.ContainsKey(key))
-                        {
-                            SurroundSoundModes.Items.Remove(key);
-                        }
-                    }
-                    else if (SurroundSoundModes.Items.TryGetValue((SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey), out ISelectableItem item))
-                    {
-                        var updatedMode = new MarantzSurroundMode(item.Key, mode.Name, this, ((MarantzSurroundMode)item).Command);
-                        SurroundSoundModes.Items[ (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey)] = updatedMode;
-                    }
+                    SurroundSoundModes.Items.Remove(key);
                 }
+                // else if (SurroundSoundModes.Items.TryGetValue((SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey), out ISelectableItem item))
+                // {
+                //     var updatedMode = new MarantzSurroundMode(item.Key, mode.Name, this, ((MarantzSurroundMode)item).Command, ((MarantzSurroundMode)item).MatchStrings);
+                //     SurroundSoundModes.Items[ (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey)] = updatedMode;
+                // }
             }
+        }
 
         private void SetupGather()
         {
