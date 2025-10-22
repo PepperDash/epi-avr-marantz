@@ -55,12 +55,16 @@ namespace PDT.Plugins.Marantz
 		[JsonProperty("inputs")]
 		public List<InputConfig> Inputs { get; set; }
 
+		[JsonProperty("surroundModes")]
+		public List<SurroundModeConfig> SurroundModes { get; set; }
+
 		public MarantzProps()
 		{
 			Inputs = new List<InputConfig>();
+			SurroundModes = new List<SurroundModeConfig>();
 		}
 	}
-	
+
 	public class InputConfig
 	{
 		[JsonProperty("name")]
@@ -71,5 +75,18 @@ namespace PDT.Plugins.Marantz
 
 		[JsonProperty("hideInput")]
 		public bool HideInput { get; set; }
+	}
+
+	public class SurroundModeConfig
+	{
+		
+		[JsonProperty("name")]
+		public string Name { get; set; }
+
+		[JsonProperty("modeKey")]
+		public string ModeKey { get; set; }
+
+		[JsonProperty("hideMode")]
+		public bool HideMode { get; set; }
 	}
 }

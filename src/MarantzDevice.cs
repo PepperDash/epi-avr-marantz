@@ -12,6 +12,7 @@ using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using PepperDash.Essentials.Core.Queues;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Text;
 using System.Linq;
 using Feedback = PepperDash.Essentials.Core.Feedback;
 
@@ -50,6 +51,7 @@ namespace PDT.Plugins.Marantz
         public ISelectableItems<string> Inputs { get; private set; }
 
         private readonly List<InputConfig> inputs;
+        private readonly List<SurroundModeConfig> surroundModes;
 
 
         private readonly GenericQueue _receiveQueue;
@@ -173,6 +175,8 @@ namespace PDT.Plugins.Marantz
             try
             {
                 inputs = config.Inputs;
+                surroundModes = config.SurroundModes;
+
                 _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
 
                 DeviceInfo = new DeviceInfo();
@@ -330,14 +334,14 @@ namespace PDT.Plugins.Marantz
                 {
                     // {eSurroundModes.Auto, new MarantzSurroundMode(eSurroundModes.Auto.ToString(), "Auto", this, "AUTO")},
                     //{eSurroundModes.Neural, new MarantzSurroundMode(eSurroundModes.Neural.ToString(), "Neural", this, "NEURAL")},
-                    {SurroundModes.Auro2DSurround, new MarantzSurroundMode(SurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR")},
-                    {SurroundModes.Auro3D, new MarantzSurroundMode(SurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D")},
-                    {SurroundModes.MultiChannelStereo, new MarantzSurroundMode(SurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
-                    {SurroundModes.MultiChannelIn, new MarantzSurroundMode(SurroundModes.MultiChannelIn.ToString(), "Multi Channel In", this, "MULTI CH IN")},
-                    {SurroundModes.DolbyDigital, new MarantzSurroundMode(SurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DSUR")},
-                    {SurroundModes.PureDirect, new MarantzSurroundMode(SurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
-                    {SurroundModes.Stereo, new MarantzSurroundMode(SurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
-                    {SurroundModes.DTS, new MarantzSurroundMode(SurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "NEURAL")},
+                    { SurroundModes.Auro2DSurround, new MarantzSurroundMode(SurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR") },
+                    { SurroundModes.Auro3D, new MarantzSurroundMode(SurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D") },
+                    { SurroundModes.MultiChannelStereo, new MarantzSurroundMode(SurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO") },
+                    { SurroundModes.MultiChannelIn, new MarantzSurroundMode(SurroundModes.MultiChannelIn.ToString(), "Multi Channel In", this, "MULTI CH IN") },
+                    { SurroundModes.DolbyDigital, new MarantzSurroundMode(SurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DSUR") },
+                    { SurroundModes.PureDirect, new MarantzSurroundMode(SurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT") },
+                    { SurroundModes.Stereo, new MarantzSurroundMode(SurroundModes.Stereo.ToString(), "Stereo", this, "STEREO") },
+                    { SurroundModes.DTS, new MarantzSurroundMode(SurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "NEURAL") },
                     //{eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
                     //{eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY", "DSUR")},
                     //{eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
@@ -349,6 +353,8 @@ namespace PDT.Plugins.Marantz
                     //{eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
                 }
             };
+
+            UpdateSurroundModes(surroundModes);
 
             // Marants SR8015 Surround Modes
             //SurroundSoundModes = new MarantzSurroundModes
@@ -376,6 +382,29 @@ namespace PDT.Plugins.Marantz
             //    }
             //};
         }
+        
+        private void UpdateSurroundModes(List<SurroundModeConfig> surroundModes)
+            {
+                if (surroundModes == null || SurroundSoundModes == null || SurroundSoundModes.Items == null)
+                    return;
+
+                foreach (var mode in surroundModes)
+                {
+                    if (mode.HideMode)
+                    {
+                        var key = (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey);
+                        if (SurroundSoundModes.Items.ContainsKey(key))
+                        {
+                            SurroundSoundModes.Items.Remove(key);
+                        }
+                    }
+                    else if (SurroundSoundModes.Items.TryGetValue((SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey), out ISelectableItem item))
+                    {
+                        var updatedMode = new MarantzSurroundMode(item.Key, mode.Name, this, ((MarantzSurroundMode)item).Command);
+                        SurroundSoundModes.Items[ (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey)] = updatedMode;
+                    }
+                }
+            }
 
         private void SetupGather()
         {
