@@ -287,10 +287,10 @@ namespace PDT.Plugins.Marantz
                 }
             };
 
-            SetupConfiguredInputs(inputs);
+            UpdateInputs(inputs);
         }
 
-        private void SetupConfiguredInputs(List<InputConfig> inputs)
+        private void UpdateInputs(List<InputConfig> inputs)
         {
             if (inputs == null || Inputs == null || Inputs.Items == null)
                 return;
