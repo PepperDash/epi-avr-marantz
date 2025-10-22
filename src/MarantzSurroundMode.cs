@@ -85,7 +85,7 @@ namespace PDT.Plugins.Marantz
         }
 
         [JsonIgnore]
-        public string[] MatchStrings => _matchStrings.ToArray();
+        public string[] MatchStrings => _matchStrings;
 
         public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, string[] matchStrings = null)
         {
@@ -93,7 +93,7 @@ namespace PDT.Plugins.Marantz
             Name          = name;
             _parent       = parent;
             _command = command;
-            this.LogVerbose("MaranztSurroundMode: Setting MatchStrings for {name} to: {@matchStrings}", name, matchStrings);
+            this.LogVerbose("MaranztSurroundMode: Setting MatchStrings for {name} to: {@matchStrings}", name, matchStrings ?? new[] { command });
             _matchStrings = matchStrings ?? new[] { command };
         }
 
