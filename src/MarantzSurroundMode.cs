@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using PepperDash.Core;
+using PepperDash.Core.Logging;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using System;
 using System.Collections.Generic;
@@ -91,7 +92,8 @@ namespace PDT.Plugins.Marantz
             Key           = key;
             Name          = name;
             _parent       = parent;
-            _command      = command;
+            _command = command;
+            this.LogVerbose("MaranztSurroundMode: Setting MatchStrings for {name} to: {@matchStrings}", name, matchStrings);
             _matchStrings = matchStrings.Length == 0 ? new []{ command } : matchStrings;
         }
 
