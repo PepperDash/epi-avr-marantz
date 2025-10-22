@@ -647,9 +647,9 @@ namespace PDT.Plugins.Marantz
 
                     //Debug.Console(2, this, "matchString: {0}", matchString);
 
-                    var mode = SurroundSoundModes.Items.Cast<KeyValuePair<SurroundModes, MarantzSurroundMode>>().FirstOrDefault(item =>
+                    var mode = SurroundSoundModes.Items.FirstOrDefault(item =>
                         {
-                            return item.Value.MatchStrings.Any(match =>
+                            return item.Value is MarantzSurroundMode s && s.MatchStrings.Any(match =>
                             {
                                 var m = matchString.IndexOf(match, StringComparison.OrdinalIgnoreCase) > -1;
                                 this.LogVerbose("ParseResponse: checking {match} against '{matchString}'. result '{result}'", match, matchString, m);
