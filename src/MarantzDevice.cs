@@ -278,7 +278,6 @@ namespace PDT.Plugins.Marantz
                     //{"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
                     //{"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
                     //{"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
-                    {"AUX8K", new MarantzInput("AUX8K", "AUX2", this, "AUX8K")},
                     {"CD", new MarantzInput("CD", "CD", this, "CD")},
                     //{"PHONO", new MarantzInput("PHONO", "PHONO", this, "PHONO")},
                     //{"TUNER", new MarantzInput("TUNER", "TUNER", this, "TUNER")},
@@ -407,7 +406,6 @@ namespace PDT.Plugins.Marantz
                 new RoutingInputPort("AUX5", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX5", this),
                 new RoutingInputPort("AUX6", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX6", this),
                 new RoutingInputPort("AUX7", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX7", this),
-                new RoutingInputPort("AUX8K", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX8K", this),
                 new RoutingInputPort("NET", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Streaming, "NET", this),
                 new RoutingInputPort("BT", eRoutingSignalType.Audio, eRoutingPortConnectionType.Streaming, "BT", this),
             };
