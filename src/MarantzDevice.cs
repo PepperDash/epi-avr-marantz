@@ -651,7 +651,13 @@ namespace PDT.Plugins.Marantz
                     var mode = SurroundSoundModes.Items.FirstOrDefault
                         (item =>
                         {
-                            return item.Value is MarantzSurroundMode s && s.MatchStrings.Any(match => matchString.IndexOf(match, StringComparison.OrdinalIgnoreCase) > -1);
+                            return item.Value is MarantzSurroundMode s && s.MatchStrings.Any(match =>
+                            {
+                                var m = matchString.IndexOf(match, StringComparison.OrdinalIgnoreCase) > -1;
+                                this.LogVerbose("ParseResponse: checking {match} against '{matchString}'. result '{result}'", match, matchString, m);
+
+                                return m;
+                            });
                         });
 
 
