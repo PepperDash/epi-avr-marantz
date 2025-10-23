@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using PepperDash.Core;
+using PepperDash.Core.Logging;
 using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using System;
 using System.Collections.Generic;
@@ -84,15 +85,16 @@ namespace PDT.Plugins.Marantz
         }
 
         [JsonIgnore]
-        public string[] MatchStrings => _matchStrings.ToArray();
+        public string[] MatchStrings => _matchStrings;
 
-        public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, params string[] matchStrings)
+        public MarantzSurroundMode(string key, string name, MarantzDevice parent, string command, string[] matchStrings = null)
         {
             Key           = key;
             Name          = name;
             _parent       = parent;
-            _command      = command;
-            _matchStrings = matchStrings.Length == 0 ? new []{ command } : matchStrings;
+            _command = command;
+            this.LogVerbose("MaranztSurroundMode: Setting MatchStrings for {name} to: {@matchStrings}", name, matchStrings ?? new[] { command });
+            _matchStrings = matchStrings ?? new[] { command };
         }
 
         public event EventHandler ItemUpdated;

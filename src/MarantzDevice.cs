@@ -12,6 +12,7 @@ using PepperDash.Essentials.Core.DeviceTypeInterfaces;
 using PepperDash.Essentials.Core.Queues;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Text;
 using System.Linq;
 using Feedback = PepperDash.Essentials.Core.Feedback;
 
@@ -48,6 +49,9 @@ namespace PDT.Plugins.Marantz
         public ISelectableItems<SurroundModes> SurroundSoundModes { get; private set; }
 
         public ISelectableItems<string> Inputs { get; private set; }
+
+        private readonly List<InputConfig> inputs;
+        private readonly List<SurroundModeConfig> surroundModes;
 
 
         private readonly GenericQueue _receiveQueue;
@@ -170,6 +174,9 @@ namespace PDT.Plugins.Marantz
             _rampRepeatTimeMs = config.RampRepeatTimeMs == 0 ? 250 : config.RampRepeatTimeMs;
             try
             {
+                inputs = config.Inputs;
+                surroundModes = config.SurroundModes;
+
                 _receiveQueue = new GenericQueue(Key + "-rxQueue", Thread.eThreadPriority.MediumPriority, 2048);
 
                 DeviceInfo = new DeviceInfo();
@@ -237,11 +244,6 @@ namespace PDT.Plugins.Marantz
                 return;
             }
 
-            //var surroundModeMessenger = new ISelectableItemsMessenger<eSurroundModes>
-            //    (string.Format("{0}-surroundSoundModes-plugin", Key),
-            //    string.Format("/device/{0}", Key),
-            //    SurroundSoundModes, "surroundSoundModes");
-
             var surroundModeMessenger = new SurroundModesMessenger<SurroundModes>
                 ($"{Key}-surroundSoundModes-plugin",
                 $"/device/{Key}",
@@ -270,7 +272,8 @@ namespace PDT.Plugins.Marantz
                     {"SAT/CBL", new MarantzInput("SAT/CBL", "SAT/CBL", this, "SAT/CBL")},
                     {"MPLAY", new MarantzInput("MPLAY", "MPLAY", this, "MPLAY")},
                     {"GAME", new MarantzInput("GAME", "GAME", this, "GAME")},
-                    {"8K", new MarantzInput("8K", "8K", this, "8K")},
+                    {"GAME1", new MarantzInput("GAME1", "GAME1", this, "GAME1")},
+                    {"GAME2", new MarantzInput("GAME2", "GAME2", this, "GAME2")},
                     {"AUX1", new MarantzInput("AUX1", "AUX1", this, "AUX1")},
                     {"AUX2", new MarantzInput("AUX2", "AUX2", this, "AUX2")},
                     //{"AUX3", new MarantzInput("AUX3", "AUX3", this, "AUX3")},
@@ -278,6 +281,7 @@ namespace PDT.Plugins.Marantz
                     //{"AUX5", new MarantzInput("AUX5", "AUX5", this, "AUX5")},
                     //{"AUX6", new MarantzInput("AUX6", "AUX6", this, "AUX6")},
                     //{"AUX7", new MarantzInput("AUX7", "AUX7", this, "AUX7")},
+                    {"8K", new MarantzInput("8K", "8K", this, "8K")},
                     {"CD", new MarantzInput("CD", "CD", this, "CD")},
                     //{"PHONO", new MarantzInput("PHONO", "PHONO", this, "PHONO")},
                     //{"TUNER", new MarantzInput("TUNER", "TUNER", this, "TUNER")},
@@ -286,6 +290,27 @@ namespace PDT.Plugins.Marantz
                     {"BT", new MarantzInput("BT", "BT", this, "BT")},
                 }
             };
+
+            UpdateInputs(inputs);
+        }
+
+        private void UpdateInputs(List<InputConfig> inputs)
+        {
+            if (inputs == null || Inputs == null || Inputs.Items == null)
+                return;
+                
+            foreach(var input in inputs)
+            {
+                if (input.HideInput && Inputs.Items.ContainsKey(input.inputKey))
+                {
+                    Inputs.Items.Remove(input.inputKey);
+                }
+                else if (Inputs.Items.TryGetValue(input.inputKey, out ISelectableItem item))
+                {
+                    var updatedInput = new MarantzInput(item.Key, input.Name, this, ((MarantzInput)item).InputCommand);
+                    Inputs.Items[input.inputKey] = updatedInput;
+                }
+            }
         }
 
         public void SetDefaultChannelLevels()
@@ -302,21 +327,21 @@ namespace PDT.Plugins.Marantz
         private void SetupDefaultSurroundModes()
         {
             // Denon AVR-2311CI Surround Modes
-            SurroundSoundModes = new MarantzSurroundModes($"{Key}-surroundModes", $"{Key} Surround Modes")
+            SurroundSoundModes = new MarantzSurroundModes($"{Key}-surroundModes", Key)
             {
 
                 Items = new Dictionary<SurroundModes, ISelectableItem>
                 {
                     // {eSurroundModes.Auto, new MarantzSurroundMode(eSurroundModes.Auto.ToString(), "Auto", this, "AUTO")},
                     //{eSurroundModes.Neural, new MarantzSurroundMode(eSurroundModes.Neural.ToString(), "Neural", this, "NEURAL")},
-                    {SurroundModes.Auro2DSurround, new MarantzSurroundMode(SurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR")},
-                    {SurroundModes.Auro3D, new MarantzSurroundMode(SurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D")},
-                    {SurroundModes.MultiChannelStereo, new MarantzSurroundMode(SurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO")},
-                    {SurroundModes.MultiChannelIn, new MarantzSurroundMode(SurroundModes.MultiChannelIn.ToString(), "Multi Channel In", this, "MULTI CH IN")},
-                    {SurroundModes.DolbyDigital, new MarantzSurroundMode(SurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DSUR")},
-                    {SurroundModes.PureDirect, new MarantzSurroundMode(SurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT")},
-                    {SurroundModes.Stereo, new MarantzSurroundMode(SurroundModes.Stereo.ToString(), "Stereo", this, "STEREO")},
-                    {SurroundModes.DTS, new MarantzSurroundMode(SurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", "NEURAL")},
+                    { SurroundModes.Auro2DSurround, new MarantzSurroundMode(SurroundModes.Auro2DSurround.ToString(), "Auro 2D Surround", this, "AURO2DSURR" ) },
+                    { SurroundModes.Auro3D, new MarantzSurroundMode(SurroundModes.Auro3D.ToString(), "Auro 3D", this, "AURO3D") },
+                    { SurroundModes.MultiChannelStereo, new MarantzSurroundMode(SurroundModes.MultiChannelStereo.ToString(), "Multi Channel Stereo", this, "MCH STEREO") },
+                    { SurroundModes.MultiChannelIn, new MarantzSurroundMode(SurroundModes.MultiChannelIn.ToString(), "Multi Channel In", this, "MULTI CH IN") },
+                    { SurroundModes.DolbyDigital, new MarantzSurroundMode(SurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", new string[] { "DSUR" }) },
+                    { SurroundModes.PureDirect, new MarantzSurroundMode(SurroundModes.PureDirect.ToString(), "Pure Direct", this, "PURE DIRECT") },
+                    { SurroundModes.Stereo, new MarantzSurroundMode(SurroundModes.Stereo.ToString(), "Stereo", this, "STEREO") },
+                    { SurroundModes.DTS, new MarantzSurroundMode(SurroundModes.DTS.ToString(), "DTS", this, "DTS SURROUND", new string[] { "DTS", "NEURAL" }) },
                     //{eSurroundModes.Direct, new MarantzSurroundMode(eSurroundModes.Direct.ToString(), "Direct", this, "DIRECT")},
                     //{eSurroundModes.DolbyDigital, new MarantzSurroundMode(eSurroundModes.DolbyDigital.ToString(), "Dolby Digital", this, "DOLBY DIGITAL", "DOLBY", "DSUR")},
                     //{eSurroundModes.JazzClub, new MarantzSurroundMode(eSurroundModes.JazzClub.ToString(), "Jazz Club", this, "JAZZ CLUB")},
@@ -328,6 +353,8 @@ namespace PDT.Plugins.Marantz
                     //{eSurroundModes.Virtual, new MarantzSurroundMode(eSurroundModes.Virtual.ToString(), "Virtual", this, "VIRTUAL")}
                 }
             };
+
+            UpdateSurroundModes(surroundModes);
 
             // Marants SR8015 Surround Modes
             //SurroundSoundModes = new MarantzSurroundModes
@@ -355,6 +382,28 @@ namespace PDT.Plugins.Marantz
             //    }
             //};
         }
+        
+        private void UpdateSurroundModes(List<SurroundModeConfig> surroundModes)
+            {
+                if (surroundModes == null || SurroundSoundModes == null || SurroundSoundModes.Items == null)
+                    return;
+
+                foreach (var mode in surroundModes)
+            {
+                if (!mode.HideMode) continue;
+                
+                var key = (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey);
+                if (SurroundSoundModes.Items.ContainsKey(key))
+                {
+                    SurroundSoundModes.Items.Remove(key);
+                }
+                // else if (SurroundSoundModes.Items.TryGetValue((SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey), out ISelectableItem item))
+                // {
+                //     var updatedMode = new MarantzSurroundMode(item.Key, mode.Name, this, ((MarantzSurroundMode)item).Command, ((MarantzSurroundMode)item).MatchStrings);
+                //     SurroundSoundModes.Items[ (SurroundModes)Enum.Parse(typeof(SurroundModes), mode.ModeKey)] = updatedMode;
+                // }
+            }
+        }
 
         private void SetupGather()
         {
@@ -369,36 +418,23 @@ namespace PDT.Plugins.Marantz
                 new RoutingInputPort("CD", eRoutingSignalType.Audio, eRoutingPortConnectionType.LineAudio, "CD", this),
                 new RoutingInputPort("DVD", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "DVD", this),
                 new RoutingInputPort("TV", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TV", this),
-                new RoutingInputPort("SAT/CBL", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi,
-                    "SAT/CBL",
-                    this),
-                new RoutingInputPort("MPLAY", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "MPLAY",
-                    this),
-                new RoutingInputPort("GAME", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME",
-                    this),
+                new RoutingInputPort("SAT/CBL", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "SAT/CBL", this),
+                new RoutingInputPort("MPLAY", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "MPLAY", this),
+                new RoutingInputPort("GAME", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME", this),
+                new RoutingInputPort("GAME1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME1", this),
+                new RoutingInputPort("GAME2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "GAME2", this),
+                new RoutingInputPort("TUNER", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TUNER", this),
+                new RoutingInputPort("HDRADIO", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "HDRADIO", this),
+                new RoutingInputPort("PHONO", eRoutingSignalType.Audio, eRoutingPortConnectionType.LineAudio, "PHONO", this),
+                new RoutingInputPort("AUX1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX1", this),
+                new RoutingInputPort("AUX2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX2", this),
+                new RoutingInputPort("AUX3", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX3", this),
+                new RoutingInputPort("AUX4", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX4", this),
+                new RoutingInputPort("AUX5", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX5", this),
+                new RoutingInputPort("AUX6", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX6", this),
+                new RoutingInputPort("AUX7", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX7", this),
                 new RoutingInputPort("8K", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "8K", this),
-                new RoutingInputPort("TUNER", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "TUNER",
-                    this),
-                new RoutingInputPort("HDRADIO", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi,
-                    "HDRADIO", this),
-                new RoutingInputPort("PHONO", eRoutingSignalType.Audio, eRoutingPortConnectionType.LineAudio, "PHONO",
-                    this),
-                new RoutingInputPort("AUX1", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX1",
-                    this),
-                new RoutingInputPort("AUX2", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX2",
-                    this),
-                new RoutingInputPort("AUX3", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX3",
-                    this),
-                new RoutingInputPort("AUX4", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX4",
-                    this),
-                new RoutingInputPort("AUX5", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX5",
-                    this),
-                new RoutingInputPort("AUX6", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX6",
-                    this),
-                new RoutingInputPort("AUX7", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Hdmi, "AUX7",
-                    this),
-                new RoutingInputPort("NET", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Streaming, "NET",
-                    this),
+                new RoutingInputPort("NET", eRoutingSignalType.AudioVideo, eRoutingPortConnectionType.Streaming, "NET", this),
                 new RoutingInputPort("BT", eRoutingSignalType.Audio, eRoutingPortConnectionType.Streaming, "BT", this),
             };
 
@@ -605,16 +641,21 @@ namespace PDT.Plugins.Marantz
                 {
                     var surroundMode = rx.Substring(2);
 
-                    //Debug.Console(2, this, "surroundMode: {0}", surroundMode);
+                    this.LogVerbose("ParseResponse: surroundMode '{0}'", surroundMode);
 
                     var matchString = surroundMode;
 
                     //Debug.Console(2, this, "matchString: {0}", matchString);
 
-                    var mode = SurroundSoundModes.Items.FirstOrDefault
-                        (item =>
+                    var mode = SurroundSoundModes.Items.FirstOrDefault(item =>
                         {
-                            return item.Value is MarantzSurroundMode s && s.MatchStrings.Any(match => matchString.IndexOf(match, StringComparison.OrdinalIgnoreCase) > -1);
+                            return item.Value is MarantzSurroundMode s && s.MatchStrings.Any(match =>
+                            {
+                                var m = matchString.IndexOf(match, StringComparison.OrdinalIgnoreCase) > -1;
+                                this.LogVerbose("ParseResponse: checking {match} against '{matchString}'. result '{result}'", match, matchString, m);
+
+                                return m;
+                            });
                         });
 
 

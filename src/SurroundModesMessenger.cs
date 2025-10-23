@@ -23,7 +23,7 @@ namespace PDT.Plugins.Marantz
 
             AddAction("/fullStatus", (id, context) =>
             {
-                SendFullStatus();
+                SendFullStatus(id);
             });
 
             device.ItemsUpdated += (sender, args) =>
@@ -53,7 +53,7 @@ namespace PDT.Plugins.Marantz
             }
         }
 
-        private void SendFullStatus()
+        private void SendFullStatus(string id = null)
         {
             try
             {
@@ -68,7 +68,7 @@ namespace PDT.Plugins.Marantz
                     }
                 };
 
-                PostStatusMessage(stateObject);
+                PostStatusMessage(stateObject, id);
             }
             catch (Exception e)
             {
