@@ -1,13 +1,8 @@
-﻿using Newtonsoft.Json;
-using PepperDash.Core;
+﻿using PepperDash.Core;
 using PepperDash.Essentials.AppServer.Messengers;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using Crestron.SimplSharp;
 using PepperDash.Essentials.AppServer;
 using PepperDash.Essentials.Core;
 
@@ -28,7 +23,7 @@ namespace PDT.Plugins.Marantz
 
             AddAction("/fullStatus", (id, content) =>
             {
-                SendFullStatus();
+                SendFullStatus(id);
             });
 
             AddAction("/setDefaultChannelLevels", (id, content) =>
@@ -42,33 +37,18 @@ namespace PDT.Plugins.Marantz
             _surroundDevice.SurroundChannelsUpdated += (sender, args) =>
             {
                 RegisterChannels();
-                SendFullStatus();
-
-                //if (_updateTimer != null)
-                //{
-                //    _updateTimer.Reset();
-                //    return;
-                //}
-                //else
-                //{
-                //    _updateTimer = new CTimer(o =>
-                //    {
-                //        RegisterChannels();
-                //        Debug.Console(2, this, "*********Surround channels updated, sending full status*********");
-                //        SendFullStatus();
-                //    }, 1000);
-                //}
+                SendFullStatus();                
             };
         }
 
-        private void SendFullStatus()
+        private void SendFullStatus(string id = null)
         {
             var message = new LevelControlStateMessage
             {
                 Levels = GetVolumeLevels()
             };
               
-            PostStatusMessage(message);
+            PostStatusMessage(message, id);
         }
 
         private void RegisterChannels()
