@@ -9,12 +9,13 @@ using System.Collections.Generic;
 
 namespace PDT.Plugins.Marantz
 {
-    public class SurroundModesMessenger<TKey> : MessengerBase
+    public class SurroundModesMessenger<TKey, TSelector> : MessengerBase
     {
         private readonly ISelectableItems<TKey> device;
-        public SurroundModesMessenger(string key, string messagePath, ISelectableItems<TKey> device) : base(key, messagePath, device as IKeyName)
+
+        public SurroundModesMessenger(string key, string messagePath, IHasSurroundSoundModes<TKey, TSelector> device) : base(key, messagePath, device as IKeyName)
         {
-            this.device = device;
+            this.device = device.SurroundSoundModes;
         }
         
         protected override void RegisterActions()

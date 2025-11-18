@@ -244,10 +244,10 @@ namespace PDT.Plugins.Marantz
                 return;
             }
 
-            var surroundModeMessenger = new SurroundModesMessenger<SurroundModes>
+            var surroundModeMessenger = new SurroundModesMessenger<SurroundModes, string>
                 ($"{Key}-surroundSoundModes-plugin",
                 $"/device/{Key}",
-                SurroundSoundModes);
+                this);
 
             mc.AddDeviceMessenger(surroundModeMessenger);
 
