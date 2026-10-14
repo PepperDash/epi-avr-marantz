@@ -4,7 +4,7 @@ using PepperDash.Essentials.Core;
 
 namespace PDT.Plugins.Marantz
 {
-    public class MarantzChannelVolume : IKeyed, IBasicVolumeWithFeedback
+    public class MarantzChannelVolume : IKeyName, IBasicVolumeWithFeedback
     {
         private readonly string _channelName;
         private readonly MarantzDevice _parent;
@@ -38,6 +38,7 @@ namespace PDT.Plugins.Marantz
             _parent = parent;
 
             Key = parent.Key + "-" + channelName;
+            Name = parent.Name + " " + channelName;
 
             // Main volume range = 38 - 62 | 0db = 50
             VolumeLevelFeedback = new IntFeedback(_channelName + "-Volume", () =>
@@ -158,5 +159,7 @@ namespace PDT.Plugins.Marantz
         }
 
         public string Key { get; private set; }
+
+        public string Name { get; private set; }
     }
 }
