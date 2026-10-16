@@ -23,7 +23,8 @@ zone 2 controls via IP connection
                 "autoReconnectInterval": 10000
             }        
         },
-        "enableZone2": true
+        "enableZone2": true,
+        "zone2FollowsMainPower": true
     }
 }
 ```
@@ -31,6 +32,7 @@ zone 2 controls via IP connection
 | Property | Type | Description |
 | -------- | ----- | ----------- |
 | enableZone2 | boolean | `true` -> Enable Zone 2 control |
+| zone2FollowsMainPower | boolean | Optional, default `false`. With `enableZone2`, main zone power on/off also turns Zone 2 on/off (`Z2ON`/`Z2OFF`, sent 1 s after `ZMON`/`ZMOFF`) |
 
 
 

@@ -45,6 +45,7 @@ namespace PDT.Plugins.Marantz
         private readonly int _rampRepeatTimeMs;
 
         private readonly MarantzZone2 _zone2;
+        private readonly bool _zone2FollowsMainPower;
 
         public ISelectableItems<SurroundModes> SurroundSoundModes { get; private set; }
 
@@ -220,6 +221,11 @@ namespace PDT.Plugins.Marantz
                 {
                     _zone2 = new MarantzZone2(Key + "-z2", Name + " - Zone 2", this);
                     DeviceManager.AddDevice(_zone2);
+                    _zone2FollowsMainPower = config.Zone2FollowsMainPower;
+                }
+                else if (config.Zone2FollowsMainPower)
+                {
+                    this.LogWarning("zone2FollowsMainPower is set but enableZone2 is false; ignoring");
                 }
             }
             catch (Exception e)
@@ -791,6 +797,8 @@ namespace PDT.Plugins.Marantz
                 _isWarmingUp = false;
                 IsWarmingUpFeedback.FireUpdate();
             }, _warmingTimeMs);
+
+            SetZone2PowerWithMain(true);
         }
 
         public void PowerOff()
@@ -805,6 +813,29 @@ namespace PDT.Plugins.Marantz
                 _isCoolingDown = false;
                 IsCoolingDownFeedback.FireUpdate();
             }, _coolingTimeMs);
+
+            SetZone2PowerWithMain(false);
+        }
+
+        /// <summary>
+        /// Sends Zone 2 power after the main zone command when zone2FollowsMainPower is enabled.
+        /// Delayed because the Marantz protocol asks for ~1 s after a power-on command before the next command.
+        /// </summary>
+        private void SetZone2PowerWithMain(bool powerOn)
+        {
+            if (!_zone2FollowsMainPower) return;
+
+            if (_zone2PowerTimer != null)
+            {
+                _zone2PowerTimer.Stop();
+                _zone2PowerTimer.Dispose();
+            }
+
+            _zone2PowerTimer = new CTimer(o =>
+            {
+                if (powerOn) _zone2.PowerOn();
+                else _zone2.PowerOff();
+            }, Zone2PowerDelayMs);
         }
 
         public void PowerToggle()
@@ -1084,6 +1115,10 @@ namespace PDT.Plugins.Marantz
         private CTimer _warmupTimer;
 
         private CTimer _cooldownTimer;
+
+        private const int Zone2PowerDelayMs = 1000;
+
+        private CTimer _zone2PowerTimer;
 
         public BoolFeedback IsWarmingUpFeedback { get; private set; }
 

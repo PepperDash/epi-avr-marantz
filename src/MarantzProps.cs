@@ -49,6 +49,13 @@ namespace PDT.Plugins.Marantz
 		[JsonProperty("enableZone2")]
 		public bool EnableZone2 { get; set; }
 
+		/// <summary>
+		/// When true (and enableZone2 is true), Zone 2 power follows main zone power:
+		/// PowerOn also sends Z2ON and PowerOff also sends Z2OFF.
+		/// </summary>
+		[JsonProperty("zone2FollowsMainPower")]
+		public bool Zone2FollowsMainPower { get; set; }
+
 		[JsonProperty("rampRepeatTimeMs")]
 		public int RampRepeatTimeMs { get; set; }
 
