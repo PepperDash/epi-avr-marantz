@@ -45,6 +45,7 @@ namespace PDT.Plugins.Marantz
         private readonly int _rampRepeatTimeMs;
 
         private readonly MarantzZone2 _zone2;
+        private readonly bool _zone2FollowsMainPower;
 
         public ISelectableItems<SurroundModes> SurroundSoundModes { get; private set; }
 
@@ -220,6 +221,11 @@ namespace PDT.Plugins.Marantz
                 {
                     _zone2 = new MarantzZone2(Key + "-z2", Name + " - Zone 2", this);
                     DeviceManager.AddDevice(_zone2);
+                    _zone2FollowsMainPower = config.Zone2FollowsMainPower;
+                }
+                else if (config.Zone2FollowsMainPower)
+                {
+                    this.LogWarning("zone2FollowsMainPower is set but enableZone2 is false; ignoring");
                 }
             }
             catch (Exception e)
@@ -781,7 +787,7 @@ namespace PDT.Plugins.Marantz
 
         public void PowerOn()
         {
-            SendText("ZMON"); // alternate: PWON
+            SendMainPower(true);
 
             _isWarmingUp = true;
             IsWarmingUpFeedback.FireUpdate();
@@ -795,7 +801,7 @@ namespace PDT.Plugins.Marantz
 
         public void PowerOff()
         {
-            SendText("ZMOFF"); // alternate: PWSTANDBY
+            SendMainPower(false);
 
             _isCoolingDown = true;
             IsCoolingDownFeedback.FireUpdate();
@@ -805,6 +811,42 @@ namespace PDT.Plugins.Marantz
                 _isCoolingDown = false;
                 IsCoolingDownFeedback.FireUpdate();
             }, _coolingTimeMs);
+        }
+
+        /// <summary>
+        /// Sends main zone power and, when zone2FollowsMainPower is enabled, schedules the matching Zone 2 command.
+        /// Zone 2 is delayed because the Marantz protocol asks for ~1 s after a power-on command before the next command.
+        /// The lock and generation keep Zone 2 matching the last main zone request when calls overlap.
+        /// </summary>
+        private void SendMainPower(bool powerOn)
+        {
+            CTimer superseded;
+
+            lock (_mainPowerLock)
+            {
+                SendText(powerOn ? "ZMON" : "ZMOFF"); // alternates: PWON / PWSTANDBY
+
+                if (!_zone2FollowsMainPower) return;
+
+                var generation = ++_zone2PowerGeneration;
+                superseded = _zone2PowerTimer;
+
+                _zone2PowerTimer = new CTimer(o =>
+                {
+                    lock (_mainPowerLock)
+                    {
+                        if (generation != _zone2PowerGeneration) return;
+
+                        if (powerOn) _zone2.PowerOn();
+                        else _zone2.PowerOff();
+                    }
+                }, Zone2PowerDelayMs);
+            }
+
+            // Outside the lock so a superseded callback waiting on it can't hold up Stop/Dispose
+            if (superseded == null) return;
+            superseded.Stop();
+            superseded.Dispose();
         }
 
         public void PowerToggle()
@@ -1084,6 +1126,14 @@ namespace PDT.Plugins.Marantz
         private CTimer _warmupTimer;
 
         private CTimer _cooldownTimer;
+
+        private const int Zone2PowerDelayMs = 1000;
+
+        private CTimer _zone2PowerTimer;
+
+        private int _zone2PowerGeneration;
+
+        private readonly object _mainPowerLock = new object();
 
         public BoolFeedback IsWarmingUpFeedback { get; private set; }
 
