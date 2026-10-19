@@ -39,8 +39,8 @@ namespace PDT.Plugins.Marantz.Mock
             this.responseDelayMs = Math.Max(0, responseDelayMs);
             replyQueue = new GenericQueue(key + "-replies");
 
-            responder.Unsolicited += lines =>
-                replyQueue.Enqueue(new ProcessStringMessage(string.Join(Delimiter.ToString(), lines), SendUnsolicited));
+            // Changes made at the receiver take their turn behind commands already queued, then report
+            responder.PanelChange += change => replyQueue.Enqueue(new ActionMessage(() => Send(change())));
         }
 
         /// <inheritdoc />
@@ -110,11 +110,6 @@ namespace PDT.Plugins.Marantz.Mock
             Send(responder.Respond(line));
         }
 
-        private void SendUnsolicited(string joinedLines)
-        {
-            Send(joinedLines.Split(Delimiter));
-        }
-
         private void Send(IList<string> lines)
         {
             foreach (var line in lines)
@@ -124,7 +119,9 @@ namespace PDT.Plugins.Marantz.Mock
                     CrestronEnvironment.Sleep(responseDelayMs);
                 }
 
-                if (!IsConnected)
+                // Checked per line, after the delay: a fault set mid-reply (or with lines still queued)
+                // must stop output at once, or late lines keep the communication monitor online
+                if (!IsConnected || responder.Fault == MockMarantzAvrFault.Silent)
                 {
                     return;
                 }
@@ -142,6 +139,21 @@ namespace PDT.Plugins.Marantz.Mock
                 {
                     textHandler(this, new GenericCommMethodReceiveTextArgs(text));
                 }
+            }
+        }
+
+        private class ActionMessage : IQueueMessage
+        {
+            private readonly Action action;
+
+            public ActionMessage(Action action)
+            {
+                this.action = action;
+            }
+
+            public void Dispatch()
+            {
+                action();
             }
         }
     }

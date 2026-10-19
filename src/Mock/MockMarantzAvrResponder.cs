@@ -92,9 +92,11 @@ namespace PDT.Plugins.Marantz.Mock
         }
 
         /// <summary>
-        /// Raised with the lines a real receiver would send unprompted after a change made at the unit
+        /// Raised with a change made at the receiver (from the console). The subscriber must run it in order
+        /// with protocol commands - the communication runs it on its reply thread - and send the lines it
+        /// returns, which are what a real receiver reports unprompted. With no subscriber it runs immediately.
         /// </summary>
-        public event Action<IList<string>> Unsolicited;
+        public event Action<Func<IList<string>>> PanelChange;
 
         /// <summary>
         /// Current fault mode
@@ -141,9 +143,7 @@ namespace PDT.Plugins.Marantz.Mock
         /// </summary>
         public void SetPower(bool on)
         {
-            IList<string> lines;
-            lock (stateLock) lines = MainZone(on ? "ON" : "OFF");
-            RaiseUnsolicited(lines);
+            QueuePanelChange(() => MainZone(on ? "ON" : "OFF"));
         }
 
         /// <summary>
@@ -152,10 +152,14 @@ namespace PDT.Plugins.Marantz.Mock
         /// <returns>False if the receiver has no such input</returns>
         public bool SetInput(string inputCode)
         {
-            IList<string> lines;
-            lock (stateLock) lines = Input((inputCode ?? string.Empty).ToUpper());
-            RaiseUnsolicited(lines);
-            return lines.Count > 0;
+            var code = (inputCode ?? string.Empty).ToUpper();
+            if (!Inputs.Contains(code))
+            {
+                return false;
+            }
+
+            QueuePanelChange(() => Input(code));
+            return true;
         }
 
         /// <summary>
@@ -163,14 +167,11 @@ namespace PDT.Plugins.Marantz.Mock
         /// </summary>
         public void SetVolume(int level)
         {
-            IList<string> lines;
-            lock (stateLock)
+            QueuePanelChange(() =>
             {
                 volume = SnapVolume(level);
-                lines = new[] { EncodeVolume("MV", volume) };
-            }
-
-            RaiseUnsolicited(lines);
+                return new[] { EncodeVolume("MV", volume) };
+            });
         }
 
         /// <summary>
@@ -178,9 +179,7 @@ namespace PDT.Plugins.Marantz.Mock
         /// </summary>
         public void SetMute(bool muted)
         {
-            IList<string> lines;
-            lock (stateLock) lines = Mute(muted ? "ON" : "OFF");
-            RaiseUnsolicited(lines);
+            QueuePanelChange(() => Mute(muted ? "ON" : "OFF"));
         }
 
         /// <summary>
@@ -196,12 +195,23 @@ namespace PDT.Plugins.Marantz.Mock
             }
         }
 
-        private void RaiseUnsolicited(IList<string> lines)
+        // A change at the receiver applies when its turn comes, after protocol commands already queued,
+        // so console changes and driver commands can't land in the wrong order
+        private void QueuePanelChange(Func<IList<string>> change)
         {
-            var handler = Unsolicited;
-            if (handler != null && lines.Count > 0 && Fault != MockMarantzAvrFault.Silent)
+            Func<IList<string>> locked = () =>
             {
-                handler(lines);
+                lock (stateLock) return change();
+            };
+
+            var handler = PanelChange;
+            if (handler != null)
+            {
+                handler(locked);
+            }
+            else
+            {
+                locked();
             }
         }
 
