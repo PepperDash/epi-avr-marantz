@@ -59,7 +59,7 @@ The `mockMarantzAvr` type builds the real Marantz device on an in-process mock r
 
 Like a real receiver, the mock reports every state change straight back, and it ignores what a real unit ignores: unknown inputs and surround modes, and volume levels that are not whole or half dB.
 
-Use the `mockmarantz` console command to make changes at the receiver, or to take it offline. Changes made this way are reported to the driver immediately, as a real receiver does with its own remote.
+Use the `mockmarantz` console command to make changes at the receiver, or to take it offline. A change made this way applies after any commands the receiver is still answering, then is reported to the driver, as a real receiver does with its own remote; the command answers `queued`, and `status` shows the result.
 
 ```
 mockmarantz avr status

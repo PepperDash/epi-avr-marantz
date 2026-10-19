@@ -114,8 +114,16 @@ namespace PDT.Plugins.Marantz.Mock
                 return;
             }
 
-            // A real receiver reports changes made at the unit straight away, so these reach the driver now
-            CrestronConsole.ConsoleCommandResponse("{0}: {1}\r\n", parts[0], responder.Describe());
+            // status and fault take effect now. The other changes are queued behind any commands the receiver
+            // is still answering, then reported to the driver, so the state isn't theirs to show yet.
+            if (verb == "status" || verb == "fault")
+            {
+                CrestronConsole.ConsoleCommandResponse("{0}: {1}\r\n", parts[0], responder.Describe());
+                return;
+            }
+
+            CrestronConsole.ConsoleCommandResponse("{0}: queued {1} {2} (check with: mockmarantz {0} status)\r\n",
+                parts[0], verb, arg);
         }
     }
 }
