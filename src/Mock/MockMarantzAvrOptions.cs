@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace PDT.Plugins.Marantz.Mock
+namespace PDT.Plugins.Marantz
 {
     /// <summary>
     /// Starting state and behaviour of the mock receiver, from the optional "mock" block in properties

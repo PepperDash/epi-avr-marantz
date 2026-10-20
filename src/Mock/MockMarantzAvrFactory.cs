@@ -4,7 +4,7 @@ using PepperDash.Core;
 using PepperDash.Essentials.Core;
 using PepperDash.Essentials.Core.Config;
 
-namespace PDT.Plugins.Marantz.Mock
+namespace PDT.Plugins.Marantz
 {
     /// <summary>
     /// Builds the real <see cref="MarantzDevice"/> on an in-process mock receiver, so a room can be

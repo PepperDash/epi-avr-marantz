@@ -4,7 +4,7 @@ using System.Linq;
 using Crestron.SimplSharp;
 using PepperDash.Core;
 
-namespace PDT.Plugins.Marantz.Mock
+namespace PDT.Plugins.Marantz
 {
     /// <summary>
     /// "mockmarantz" console command for driving mock receivers by device key
@@ -38,16 +38,19 @@ namespace PDT.Plugins.Marantz.Mock
                 }
 
                 // The console command is a convenience: never let it stop the receiver from loading
+                // Only a successful add counts, so the next mock to register retries after a failure.
                 try
                 {
-                    CrestronConsole.AddNewConsoleCommand(Handle, "mockmarantz", Help, ConsoleAccessLevelEnum.AccessOperator);
+                    commandAdded = CrestronConsole.AddNewConsoleCommand(Handle, "mockmarantz", Help, ConsoleAccessLevelEnum.AccessOperator);
+                    if (!commandAdded)
+                    {
+                        Debug.LogError("Unable to add the mockmarantz console command (it may already exist)");
+                    }
                 }
                 catch (Exception e)
                 {
                     Debug.LogError("Unable to add the mockmarantz console command: {0}", e.Message);
                 }
-
-                commandAdded = true;
             }
         }
 

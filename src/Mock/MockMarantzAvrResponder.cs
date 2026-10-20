@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace PDT.Plugins.Marantz.Mock
+namespace PDT.Plugins.Marantz
 {
     /// <summary>
     /// How the mock receiver misbehaves, for exercising the driver's error paths. The Denon/Marantz
@@ -101,7 +101,14 @@ namespace PDT.Plugins.Marantz.Mock
         /// <summary>
         /// Current fault mode
         /// </summary>
-        public MockMarantzAvrFault Fault { get; set; }
+        // Written by the console thread, read by the reply thread: synchronize both sides
+        private MockMarantzAvrFault fault;
+
+        public MockMarantzAvrFault Fault
+        {
+            get { lock (stateLock) return fault; }
+            set { lock (stateLock) fault = value; }
+        }
 
         /// <summary>
         /// Answers one command line (without the \r delimiter)

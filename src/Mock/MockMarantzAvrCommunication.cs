@@ -5,7 +5,7 @@ using Crestron.SimplSharp;
 using PepperDash.Core;
 using PepperDash.Essentials.Core.Queues;
 
-namespace PDT.Plugins.Marantz.Mock
+namespace PDT.Plugins.Marantz
 {
     /// <summary>
     /// In-process stand-in for the receiver's control port. Commands sent by the driver are answered
