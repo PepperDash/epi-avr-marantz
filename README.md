@@ -20,7 +20,7 @@ zone 2 controls via IP connection
                 "port": 23,
                 "address": "",
                 "autoReconnect": true,
-                "autoReconnectInterval": 10000
+                "autoReconnectIntervalMs": 10000
             }        
         },
         "enableZone2": true,
@@ -86,15 +86,49 @@ Provided under MIT license
 
 ```json
 {
-    "key": "GeneratedKey",
+    "key": "avr",
     "uid": 1,
-    "name": "GeneratedName",
+    "name": "AVR",
     "type": "MarantzAvr",
-    "group": "Group",
+    "group": "avr",
     "properties": {
-        "name": "SampleString",
-        "inputKey": "SampleString",
-        "hideInput": true
+        "control": {
+            "method": "tcpIp",
+            "tcpSshProperties": {
+                "address": "192.0.2.10",
+                "port": 23,
+                "autoReconnect": true,
+                "autoReconnectIntervalMs": 10000
+            }
+        },
+        "monitor": {
+            "pollInterval": 30000,
+            "timeToWarning": 60000,
+            "timeToError": 120000,
+            "pollString": "PW?\r"
+        },
+        "enableZone2": true,
+        "zone2FollowsMainPower": false,
+        "rampRepeatTimeMs": 250,
+        "inputs": [
+            {
+                "name": "Cable",
+                "inputKey": "SAT/CBL",
+                "hideInput": false
+            },
+            {
+                "name": "Phono",
+                "inputKey": "CD",
+                "hideInput": true
+            }
+        ],
+        "surroundModes": [
+            {
+                "name": "Dolby Digital",
+                "modeKey": "DolbyDigital",
+                "hideMode": true
+            }
+        ]
     }
 }
 ```
@@ -103,6 +137,7 @@ Provided under MIT license
 ### Supported Types
 
 - MarantzAvr
+- mockMarantzAvr
 <!-- END Supported Types -->
 <!-- START Join Maps -->
 ### Join Maps
