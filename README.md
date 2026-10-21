@@ -1,11 +1,11 @@
-![PepperDash Essentials Pluign Logo](/images/essentials-plugin-blue.png)
-
-# Denon/Marantz AVR Plugin
+![PepperDash Essentials Plugin Logo](/images/essentials-plugin-blue.png)
 
 ![PepperDash Essentials](https://img.shields.io/badge/PepperDash%20Essentials-≥%20v2.43.0-blue)
 ![.NET](https://img.shields.io/badge/.NET%20Framework-4.7.2-512BD4)
 ![Crestron](https://img.shields.io/badge/Crestron-4--Series-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+# Denon/Marantz AVR Plugin
 
 This plugin provides control of most Denon or Marantz AVRs, including surround modes, volume control, power control, input selection, and
 zone 2 controls via IP connection
