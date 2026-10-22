@@ -84,55 +84,22 @@ Provided under MIT license
 ### Minimum Essentials Framework Versions
 
 - 2.43.0
+- 2.43.0
 <!-- END Minimum Essentials Framework Versions -->
 <!-- START Config Example -->
 ### Config Example
 
 ```json
 {
-    "key": "avr",
+    "key": "GeneratedKey",
     "uid": 1,
-    "name": "AVR",
+    "name": "GeneratedName",
     "type": "MarantzAvr",
-    "group": "avr",
+    "group": "Group",
     "properties": {
-        "control": {
-            "method": "tcpIp",
-            "tcpSshProperties": {
-                "address": "192.0.2.10",
-                "port": 23,
-                "autoReconnect": true,
-                "autoReconnectIntervalMs": 10000
-            }
-        },
-        "monitor": {
-            "pollInterval": 30000,
-            "timeToWarning": 60000,
-            "timeToError": 120000,
-            "pollString": "PW?\r"
-        },
-        "enableZone2": true,
-        "zone2FollowsMainPower": false,
-        "rampRepeatTimeMs": 250,
-        "inputs": [
-            {
-                "name": "Cable",
-                "inputKey": "SAT/CBL",
-                "hideInput": false
-            },
-            {
-                "name": "Phono",
-                "inputKey": "CD",
-                "hideInput": true
-            }
-        ],
-        "surroundModes": [
-            {
-                "name": "Dolby Digital",
-                "modeKey": "DolbyDigital",
-                "hideMode": true
-            }
-        ]
+        "name": "SampleString",
+        "inputKey": "SampleString",
+        "hideInput": true
     }
 }
 ```
@@ -141,7 +108,6 @@ Provided under MIT license
 ### Supported Types
 
 - MarantzAvr
-- mockMarantzAvr
 <!-- END Supported Types -->
 <!-- START Join Maps -->
 ### Join Maps
@@ -162,36 +128,56 @@ Provided under MIT license
 <!-- START Interfaces Implemented -->
 ### Interfaces Implemented
 
-- IOnline
+- ISelectableItems<SurroundModes>
+- IKeyName
+- IBasicVolumeWithFeedback
+- ISelectableItems<string>
 - IHasPowerControlWithFeedback
 - IBasicVolumeWithFeedbackAdvanced
+- IHasInputs<string>
+- IWarmingCooling
+- IOnline
 - IRouting
 - ICommunicationMonitor
 - IHasFeedback
 - IHasSurroundChannels
-- IHasInputs<string>
 - IRoutingSinkWithSwitching
 - IDeviceInfoProvider
 - IHasSurroundSoundModes<SurroundModes
-- IWarmingCooling
-- IKeyName
-- IBasicVolumeWithFeedback
-- ISelectableItems<SurroundModes>
-- ISelectableItems<string>
 - IBasicCommunication
 <!-- END Interfaces Implemented -->
 <!-- START Base Classes -->
 ### Base Classes
 
+- MessengerBase
+- JoinMapBaseAdvanced
+- EssentialsDevice
 - EssentialsBridgeableDevice
 - string>
-- EssentialsDevice
-- JoinMapBaseAdvanced
-- MessengerBase
 <!-- END Base Classes -->
 <!-- START Public Methods -->
 ### Public Methods
 
+- public void Select()
+- public void VolumeUp(bool pressRelease)
+- public void VolumeDown(bool pressRelease)
+- public void MuteOn()
+- public void MuteOff()
+- public void MuteToggle()
+- public void SetVolume(ushort level)
+- public void ParseResponse(string response)
+- public void Select()
+- public void Select()
+- public void PowerOn()
+- public void PowerOff()
+- public void PowerToggle()
+- public void VolumeUp(bool pressRelease)
+- public void VolumeDown(bool pressRelease)
+- public void MuteToggle()
+- public void MuteOn()
+- public void MuteOff()
+- public void SetVolume(ushort level)
+- public void SetInput(string input)
 - public void SetDefaultChannelLevels()
 - public void SendText(string text)
 - public void PowerOn()
@@ -208,50 +194,30 @@ Provided under MIT license
 - public void ExecuteSwitch(object inputSelector, object outputSelector, eRoutingSignalType signalType)
 - public void ExecuteSwitch(object inputSelector)
 - public void UpdateDeviceInfo()
-- public void PowerOn()
-- public void PowerOff()
-- public void PowerToggle()
-- public void VolumeUp(bool pressRelease)
-- public void VolumeDown(bool pressRelease)
-- public void MuteToggle()
-- public void MuteOn()
-- public void MuteOff()
-- public void SetVolume(ushort level)
-- public void SetInput(string input)
-- public void VolumeUp(bool pressRelease)
-- public void VolumeDown(bool pressRelease)
-- public void MuteOn()
-- public void MuteOff()
-- public void MuteToggle()
-- public void SetVolume(ushort level)
-- public void ParseResponse(string response)
-- public void Select()
-- public void Select()
-- public void Select()
-- public void SetPower(bool on)
-- public bool SetInput(string inputCode)
-- public void SetVolume(int level)
-- public void SetMute(bool muted)
-- public string Describe()
 - public void Connect()
 - public void Disconnect()
 - public void SendText(string text)
 - public void SendBytes(byte[] bytes)
 - public void Dispatch()
+- public void SetPower(bool on)
+- public bool SetInput(string inputCode)
+- public void SetVolume(int level)
+- public void SetMute(bool muted)
+- public string Describe()
 <!-- END Public Methods -->
 <!-- START Bool Feedbacks -->
 ### Bool Feedbacks
 
+- MuteFeedback
+- PowerIsOnFeedback
+- MuteFeedback
+- IsWarmingUpFeedback
+- IsCoolingDownFeedback
 - IsOnline
 - PowerIsOnFeedback
 - MuteFeedback
 - IsWarmingUpFeedback
 - IsCoolingDownFeedback
-- PowerIsOnFeedback
-- MuteFeedback
-- IsWarmingUpFeedback
-- IsCoolingDownFeedback
-- MuteFeedback
 <!-- END Bool Feedbacks -->
 <!-- START Int Feedbacks -->
 ### Int Feedbacks
