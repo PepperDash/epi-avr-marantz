@@ -14,36 +14,30 @@ namespace PDT.Plugins.Marantz
             if (requestedLevel > 980 || requestedLevel < 0)
                 throw new ArgumentOutOfRangeException("requested level", "the max level allowed is 980 the min level is 0");
 
-            var level = requestedLevel;
+            return prefix + FormatLevel(requestedLevel);
+        }
 
-            if(requestedLevel % 10 == 0) level = requestedLevel / 10;
+        /// <summary>
+        /// Formats a level on the 0-980 scale (10 per dB) the way the receiver reads it: whole dB as two
+        /// digits ("45" = 45 dB), half dB as three digits ending in 5 ("455" = 45.5 dB). Levels in between
+        /// are snapped to the nearest half dB, since the receiver ignores anything else, and an unpadded
+        /// two-digit value would be read as whole dB ("98" from level 98 means 98 dB, not 9.8 dB).
+        /// </summary>
+        private static string FormatLevel(int level)
+        {
+            var snapped = (int)Math.Round(level / 5.0, MidpointRounding.AwayFromZero) * 5;
 
-            var levelToSend = level.ToString();
-
-            // if the level is less than 10, pad it with a 0
-            if(requestedLevel < 100)
-            {
-                Debug.LogMessage(Serilog.Events.LogEventLevel.Verbose, $"Requested level is less than 100, padding with 0. Requested level: {level}");
-
-                if (requestedLevel % 10 == 0) levelToSend = level.ToString("D").PadLeft(2, '0');
-                else if (requestedLevel % 10 == 5) levelToSend = level.ToString("D").PadLeft(3, '0');
-            }
-
-            return prefix + levelToSend;
+            return snapped % 10 == 0
+                ? (snapped / 10).ToString("D2")
+                : snapped.ToString("D3");
         }
 
         public static string ChannelVolumeCommand(string channelName, int requestedLevel)
         {
             if (requestedLevel > 620 || requestedLevel < 380)
-                throw new ArgumentOutOfRangeException("requested level", "the max level allowed is 380");
+                throw new ArgumentOutOfRangeException("requested level", "the level allowed is 380 to 620");
 
-            if (requestedLevel % 10 == 0) requestedLevel = requestedLevel / 10;
-            var level = requestedLevel.ToString();
-
-            // if the level is less than 10, pad it with a 0
-            if (requestedLevel < 10)  level = requestedLevel.ToString("D").PadLeft(2, '0');
-
-            return "CV" + channelName + " " + level;
+            return "CV" + channelName + " " + FormatLevel(requestedLevel);
         }
     }
 }
