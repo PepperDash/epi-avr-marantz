@@ -9,7 +9,9 @@ namespace PDT.Plugins.Marantz
     {
         public MarantzDeviceFactory()
         {
-            MinimumEssentialsFrameworkVersion = "2.4.4";
+            // Keep equal to the PepperDashEssentials PackageReference version in the csproj: the version
+            // this plugin is compiled against is its minimum
+            MinimumEssentialsFrameworkVersion = "2.43.0";
             TypeNames = new List<string>() {"MarantzAvr"};
         }
 
